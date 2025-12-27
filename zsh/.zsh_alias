@@ -1,0 +1,5 @@
+# Aliases
+alias ld='lazydocker'
+alias lg='lazygit'
+alias pw='pass-cli'
+

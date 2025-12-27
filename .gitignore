@@ -1,0 +1,4 @@
+# Ignore stow conflicts
+.DS_Store
+*~
+*.swp
