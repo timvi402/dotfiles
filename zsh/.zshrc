@@ -75,16 +75,6 @@ source ~/.oh-my-zsh/custom/themes/tokyo-night/tokyonight_night-zsh-syntax-highli
 # Would you like to use another custom folder than $ZSH/custom?
 # ZSH_CUSTOM=/path/to/new-custom-folder
 
-# Which plugins would you like to load?
-# Standard plugins can be found in $ZSH/plugins/
-# Custom plugins may be added to $ZSH_CUSTOM/plugins/
-# Example format: plugins=(rails git textmate ruby lighthouse)
-# Add wisely, as too many plugins slow down shell startup.
-plugins=(git zsh-syntax-highlighting zsh-autosuggestions)
-
-source $ZSH/oh-my-zsh.sh
-
-# User configuration
 
 # export MANPATH="/usr/local/man:$MANPATH"
 
@@ -140,8 +130,6 @@ export XDG_BIN_HOME="$HOME/.local/bin"
 export PATH=$HOME/.local/bin:$HOME/.dotnet/tools:$PATH
 ZSH_COMPDUMP="$XDG_CACHE_HOME/zsh/zcompdump/.zcomdump"
 
-# ZSH_THEME="powerlevel10k/powerlevel10k"
-# ZSH_THEME="sunrise"
 
 # Set list of plugins
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete)
@@ -160,10 +148,22 @@ autoload -U compinit -d $XDG_CACHE_HOME/zsh/zcompdump/.zcomdump
 # Tokyo Night theme for FZF
 [ -f ~/.oh-my-zsh/custom/themes/tokyo-night/tokyonight_night.sh ] && source ~/.oh-my-zsh/custom/themes/tokyo-night/tokyonight_night.sh
 
-
-
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+
+
+# Redraw prompt after changing directory inside a ZLE widget
+# Pattern taken from fzf's own integration.
+__redraw_prompt() {
+  local precmd
+  for precmd in $precmd_functions; do
+    $precmd           # run all precmd hooks (Powerlevel10k updates here)
+  done
+  zle .reset-prompt   # recompute prompt
+  zle -R              # repaint
+}
+
+
 
 # Ctrl+F fuzzy file finder
 __fzf_file_finder() {
@@ -171,11 +171,7 @@ __fzf_file_finder() {
   selected=$(find . -type f 2>/dev/null | fzf --prompt="Find file> " --preview='cat {}' --preview-window=right:50%:wrap 2>/dev/null)
   if [[ -n "$selected" ]]; then
     nvim "$selected"
-    zle reset-prompt
-    # Trigger precmd hooks to update prompt
-    for func in $precmd_functions; do
-      $func
-    done
+    zle .reset-prompt
   fi
 }
 
@@ -184,183 +180,92 @@ zle -N __fzf_file_finder
 bindkey '^F' __fzf_file_finder
 
 
+
+
+
 __fzf_dir_finder() {
   local selected
 
-  selected=$(find . -type d 2>/dev/null | fzf \
-    --prompt="Find directory> " \
-    --preview='ls -lah {}' \
-    --preview-window=right:50%:wrap) || return
+  selected=$(
+    find . -type d 2>/dev/null |
+    fzf --prompt="Find directory> " \
+        --preview='ls -lah {}' \
+        --preview-window=right:50%:wrap
+  ) || { zle redisplay; return }
 
-  [[ -n $selected ]] || return
+  [[ -n $selected ]] || { zle redisplay; return }
 
-  builtin cd -- "$selected" || return
+  # Change directory quietly
+  builtin cd -- "$selected" 2>/dev/null || { zle redisplay; return }
 
-  (( ${+functions[p10k]} )) && p10k reload
+  # Clean up and redraw the prompt (including P10k path segment)
   zle -I
-  zle reset-prompt
+  __redraw_prompt
 }
 
 zle -N __fzf_dir_finder
 bindkey '^D' __fzf_dir_finder
 
 
-# pwd based on the value of _ZO_RESOLVE_SYMLINKS.
-function __zoxide_pwd() {
-    \builtin pwd -L
-}
-
-# cd + custom logic based on the value of _ZO_ECHO.
-function __zoxide_cd() {
-    # shellcheck disable=SC2164
-    \builtin cd -- "$@"
-}
-
-# =============================================================================
-#
-# Hook configuration for zoxide.
-#
-
-# Hook to add new entries to the database.
-function __zoxide_hook() {
-    # shellcheck disable=SC2312
-    \command zoxide add -- "$(__zoxide_pwd)"
-}
-
-# Initialize hook.
-\builtin typeset -ga precmd_functions
-\builtin typeset -ga chpwd_functions
-# shellcheck disable=SC2034,SC2296
-precmd_functions=("${(@)precmd_functions:#__zoxide_hook}")
-# shellcheck disable=SC2034,SC2296
-chpwd_functions=("${(@)chpwd_functions:#__zoxide_hook}")
-chpwd_functions+=(__zoxide_hook)
-
-# Report common issues.
-function __zoxide_doctor() {
-    [[ ${_ZO_DOCTOR:-1} -ne 0 ]] || return 0
-    [[ ${chpwd_functions[(Ie)__zoxide_hook]:-} -eq 0 ]] || return 0
-
-    _ZO_DOCTOR=0
-    \builtin printf '%s\n' \
-        'zoxide: detected a possible configuration issue.' \
-        'Please ensure that zoxide is initialized right at the end of your shell configuration file (usually ~/.zshrc).' \
-        '' \
-        'If the issue persists, consider filing an issue at:' \
-        'https://github.com/ajeetdsouza/zoxide/issues' \
-        '' \
-        'Disable this message by setting _ZO_DOCTOR=0.' \
-        '' >&2
-}
-
-# =============================================================================
-#
-# When using zoxide with --no-cmd, alias these internal functions as desired.
-#
-
-# Jump to a directory using only keywords.
-function __zoxide_z() {
-    __zoxide_doctor
-    if [[ "$#" -eq 0 ]]; then
-        __zoxide_cd ~
-    elif [[ "$#" -eq 1 ]] && { [[ -d "$1" ]] || [[ "$1" = '-' ]] || [[ "$1" =~ ^[-+][0-9]$ ]]; }; then
-        __zoxide_cd "$1"
-    elif [[ "$#" -eq 2 ]] && [[ "$1" = "--" ]]; then
-        __zoxide_cd "$2"
-    else
-        \builtin local result
-        # shellcheck disable=SC2312
-        result="$(\command zoxide query --exclude "$(__zoxide_pwd)" -- "$@")" && __zoxide_cd "${result}"
-    fi
-}
-
-# Jump to a directory using interactive search.
-function __zoxide_zi() {
-    __zoxide_doctor
-    \builtin local result
-    result="$(\command zoxide query --interactive -- "$@")" && __zoxide_cd "${result}"
-}
-
-# =============================================================================
-#
-# Commands for zoxide. Disable these using --no-cmd.
-#
-
-function z() {
-    __zoxide_z "$@"
-}
-
-function zi() {
-    __zoxide_zi "$@"
-}
-
-# Completions.
-if [[ -o zle ]]; then
-    __zoxide_result=''
-
-    function __zoxide_z_complete() {
-        # Only show completions when the cursor is at the end of the line.
-        # shellcheck disable=SC2154
-        [[ "${#words[@]}" -eq "${CURRENT}" ]] || return 0
-
-        if [[ "${#words[@]}" -eq 2 ]]; then
-            # Show completions for local directories.
-            _cd -/
-
-        elif [[ "${words[-1]}" == '' ]]; then
-            # Show completions for Space-Tab.
-            # shellcheck disable=SC2086
-            __zoxide_result="$(\command zoxide query --exclude "$(__zoxide_pwd || \builtin true)" --interactive -- ${words[2,-1]})" || __zoxide_result=''
-
-            # Set a result to ensure completion doesn't re-run
-            compadd -Q ""
-
-            # Bind '\e[0n' to helper function.
-            \builtin bindkey '\e[0n' '__zoxide_z_complete_helper'
-            # Sends query device status code, which results in a '\e[0n' being sent to console input.
-            \builtin printf '\e[5n'
-
-            # Report that the completion was successful, so that we don't fall back
-            # to another completion function.
-            return 0
-        fi
-    }
-
-    function __zoxide_z_complete_helper() {
-        if [[ -n "${__zoxide_result}" ]]; then
-            # shellcheck disable=SC2034,SC2296
-            BUFFER="z ${(q-)__zoxide_result}"
-            __zoxide_result=''
-            \builtin zle reset-prompt
-            \builtin zle accept-line
-        else
-            \builtin zle reset-prompt
-        fi
-    }
-    \builtin zle -N __zoxide_z_complete_helper
-
-    [[ "${+functions[compdef]}" -ne 0 ]] && \compdef __zoxide_z_complete z
-fi
-
-# Ctrl+P: fuzzy-search git projects under ~/source/repos
 export PROJECT_ROOT="$HOME/source/repos"
 
 _fuzzy_project_cd() {
-
+  local selection
   selection=$(
     {
-      # List all project directories
       command find "$PROJECT_ROOT" \
         -mindepth 1 -maxdepth 3 \
         -type d -name .git -prune 2>/dev/null \
       | sed 's|/\.git$||'
     } | sort -u | fzf --prompt="Project > " --height=40% --reverse
-  ) || return 0
+  ) || { zle redisplay; return }
 
-  cd $selection && nvim +'Neotree reveal'
+  [[ -n $selection ]] || { zle redisplay; return }
+
+  builtin cd -- "$selection" 2>/dev/null || { zle redisplay; return }
+
+  zle -I
+  __redraw_prompt
+
+  # Now launch Neovim without printing any command line
+  nvim +'Neotree reveal'
 }
 
 zle -N _fuzzy_project_cd
 bindkey '^P' _fuzzy_project_cd
 
+
+
+setopt AUTO_PUSHD
+setopt PUSHD_IGNORE_DUPS
+setopt PUSHD_SILENT
+
+_dir_back() {
+  if ! builtin popd -q 2>/dev/null; then
+    # Empty stack or error – stay silent
+    zle -I
+    zle redisplay
+    return 0
+  fi
+
+  zle -I
+  __redraw_prompt
+}
+
+_dir_forward() {
+  if ! builtin pushd -q +1 2>/dev/null; then
+    # No forward entry – stay silent
+    zle -I
+    zle redisplay
+    return 0
+  fi
+
+  zle -I
+  __redraw_prompt
+}
+
+zle -N _dir_back
+zle -N _dir_forward
+bindkey '\e[1;3D' _dir_back     # Alt+ArrowLeft
+bindkey '\e[1;3C' _dir_forward  # Alt+ArrowRight
 
