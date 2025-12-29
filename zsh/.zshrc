@@ -240,6 +240,15 @@ setopt AUTO_PUSHD
 setopt PUSHD_IGNORE_DUPS
 setopt PUSHD_SILENT
 
+# Browser-like navigation: forward stack for Alt+Right
+typeset -g -a _dir_forward_stack
+
+# Clear forward stack when changing directory normally
+_clear_forward_stack() {
+  _dir_forward_stack=()
+}
+chpwd_functions+=(_clear_forward_stack)
+
 _dir_back() {
   if ! builtin popd -q 2>/dev/null; then
     # Empty stack or error – stay silent
@@ -248,17 +257,31 @@ _dir_back() {
     return 0
   fi
 
+  # Save the directory we just left to forward stack
+  _dir_forward_stack+=("$OLDPWD")
+
   zle -I
   __redraw_prompt
 }
 
 _dir_forward() {
-  if ! builtin pushd -q +1 2>/dev/null; then
-    # No forward entry – stay silent
+  # Only allow forward if we have entries in the forward stack
+  if [[ ${#_dir_forward_stack[@]} -eq 0 ]]; then
     zle -I
     zle redisplay
     return 0
   fi
+
+  # Get the last directory from forward stack
+  local target="${_dir_forward_stack[-1]}"
+  _dir_forward_stack[-1]=()
+
+  # Push current dir and change to target
+  builtin pushd -q "$target" 2>/dev/null || {
+    zle -I
+    zle redisplay
+    return 0
+  }
 
   zle -I
   __redraw_prompt
@@ -266,6 +289,6 @@ _dir_forward() {
 
 zle -N _dir_back
 zle -N _dir_forward
-bindkey '\e[1;3D' _dir_back     # Alt+ArrowLeft
-bindkey '\e[1;3C' _dir_forward  # Alt+ArrowRight
+bindkey '\e[D' _dir_back     # Alt+ArrowLeft (browser-style)
+bindkey '\e[C' _dir_forward  # Alt+ArrowRight (browser-style)
 
