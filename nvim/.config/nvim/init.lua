@@ -248,6 +248,7 @@ require('lazy').setup({
         { '<leader>s', group = '[S]earch' },
         { '<leader>t', group = '[T]oggle' },
         { '<leader>h', group = 'Git [H]unk', mode = { 'n', 'v' } },
+        { '<leader>d', group = '[D]otnet' },
       },
     },
   },
@@ -930,7 +931,46 @@ require('lazy').setup({
     'GustavEikaas/easy-dotnet.nvim',
     dependencies = { 'nvim-lua/plenary.nvim', 'nvim-telescope/telescope.nvim' },
     config = function()
-      require('easy-dotnet').setup()
+      local dotnet = require 'easy-dotnet'
+      dotnet.setup {
+        test_runner = {
+          noBuild = true,
+          noRestore = true,
+        },
+      }
+
+      -- Keymaps for easy-dotnet
+      vim.keymap.set('n', '<leader>dr', function()
+        dotnet.run_project()
+      end, { desc = '[D]otnet [R]un project' })
+
+      vim.keymap.set('n', '<leader>dt', function()
+        dotnet.test_project()
+      end, { desc = '[D]otnet [T]est project' })
+
+      vim.keymap.set('n', '<leader>ds', function()
+        dotnet.run_with_profile()
+      end, { desc = '[D]otnet run with [S]elect profile' })
+
+      vim.keymap.set('n', '<leader>dp', function()
+        dotnet.pick_project()
+      end, { desc = '[D]otnet [P]ick project' })
+
+      vim.keymap.set('n', '<leader>dS', function()
+        dotnet.pick_solution()
+      end, { desc = '[D]otnet pick [S]olution' })
+
+      vim.keymap.set('n', '<leader>db', function()
+        dotnet.build_project()
+      end, { desc = '[D]otnet [B]uild project' })
+
+      vim.keymap.set('n', '<leader>dc', function()
+        dotnet.clean_project()
+      end, { desc = '[D]otnet [C]lean project' })
+
+      vim.keymap.set('n', '<leader>dR', function()
+        dotnet.restore_project()
+      end, { desc = '[D]otnet [R]estore project' })
     end,
   },
 }, {

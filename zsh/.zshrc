@@ -135,7 +135,7 @@ ZSH_COMPDUMP="$XDG_CACHE_HOME/zsh/zcompdump/.zcomdump"
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete)
 
 source $ZSH/oh-my-zsh.sh
-source .zsh_profile
+source ~/.zsh_profile
 autoload -U compinit -d $XDG_CACHE_HOME/zsh/zcompdump/.zcomdump
 
 
