@@ -289,6 +289,6 @@ _dir_forward() {
 
 zle -N _dir_back
 zle -N _dir_forward
-bindkey '\e[D' _dir_back     # Alt+ArrowLeft (browser-style)
-bindkey '\e[C' _dir_forward  # Alt+ArrowRight (browser-style)
+bindkey '^[[1;3D' _dir_back     # Alt+ArrowLeft (browser-style)
+bindkey '^[[1;3C' _dir_forward  # Alt+ArrowRight (browser-style)
 

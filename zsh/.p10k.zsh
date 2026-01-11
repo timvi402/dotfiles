@@ -33,6 +33,7 @@
   typeset -g POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(
     os_icon                 # os identifier
     dir                     # current directory
+    dir_nav_stacks          # directory navigation stack sizes
     vcs                     # git status
     # prompt_char           # prompt symbol
   )
@@ -1772,6 +1773,13 @@
   # Type `p10k help segment` for documentation and a more sophisticated example.
   function prompt_example() {
     p10k segment -b 1 -f 3 -i '⭐' -t 'hello, %n'
+  }
+
+  # Display directory navigation stack sizes (backward|forward)
+  function prompt_dir_nav_stacks() {
+    local back=${#dirstack[@]}
+    local forward=${#_dir_forward_stack[@]}
+    p10k segment -f blue -t "◀${back}|${forward}▶"
   }
 
   # User-defined prompt segments may optionally provide an instant_prompt_* function. Its job
