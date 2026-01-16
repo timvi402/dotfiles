@@ -180,6 +180,19 @@ zle -N __fzf_file_finder
 bindkey '^F' __fzf_file_finder
 
 
+# Ctrl+H fuzzy history search
+__fzf_history_search() {
+  local selected
+  selected=$(fc -rl 1 | awk '{$1=""; print substr($0,2)}' | fzf --prompt="History> " --tac --no-sort --exact 2>/dev/null)
+  if [[ -n "$selected" ]]; then
+    BUFFER="$selected"
+    CURSOR=$#BUFFER
+    zle redisplay
+  fi
+}
+
+zle -N __fzf_history_search
+bindkey '^H' __fzf_history_search
 
 
 
@@ -210,19 +223,20 @@ bindkey '^D' __fzf_dir_finder
 export PROJECT_ROOT="$HOME/source/repos"
 
 _fuzzy_project_cd() {
-  local selection
+  local selection display_path
   selection=$(
     {
       command find "$PROJECT_ROOT" \
         -mindepth 1 -maxdepth 3 \
         -type d -name .git -prune 2>/dev/null \
       | sed 's|/\.git$||'
-    } | sort -u | fzf --prompt="Project > " --height=40% --reverse
+    } | sort -u | sed "s|^$PROJECT_ROOT/||" | fzf --prompt="Project > " --height=40% --reverse
   ) || { zle redisplay; return }
 
   [[ -n $selection ]] || { zle redisplay; return }
 
-  builtin cd -- "$selection" 2>/dev/null || { zle redisplay; return }
+  # Reconstruct full path for cd
+  builtin cd -- "$PROJECT_ROOT/$selection" 2>/dev/null || { zle redisplay; return }
 
   zle -I
   __redraw_prompt
