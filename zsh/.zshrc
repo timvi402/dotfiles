@@ -17,9 +17,6 @@ export ZSH="$HOME/.oh-my-zsh"
 # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
 ZSH_THEME="powerlevel10k/powerlevel10k"
 
-# Tokyo Night syntax highlighting theme
-source ~/.oh-my-zsh/custom/themes/tokyo-night/tokyonight_night-zsh-syntax-highlighting.zsh
-
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
 # a theme from this variable instead of looking in $ZSH/themes/
@@ -107,7 +104,6 @@ source ~/.oh-my-zsh/custom/themes/tokyo-night/tokyonight_night-zsh-syntax-highli
 export DOTNET_ROOT=$HOME/.dotnet
 export PATH="$DOTNET_ROOT:$PATH:$HOME/.local/bin"
 export PATH="$PATH:$HOME/.dotnet/tools"
-export PATH="$PATH:/home/timmy-xlent/.local/share/JetBrains/Toolbox/scripts"
 
 
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zsh/.zshrc.
@@ -135,6 +131,10 @@ ZSH_COMPDUMP="$XDG_CACHE_HOME/zsh/zcompdump/.zcomdump"
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete)
 
 source $ZSH/oh-my-zsh.sh
+
+# Tokyo Night syntax highlighting theme
+source ~/.oh-my-zsh/custom/themes/tokyo-night/tokyonight_night-zsh-syntax-highlighting.zsh
+
 source ~/.zsh_profile
 autoload -U compinit -d $XDG_CACHE_HOME/zsh/zcompdump/.zcomdump
 

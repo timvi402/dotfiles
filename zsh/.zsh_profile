@@ -1,4 +1,4 @@
-source .zsh_alias
+source ~/.zsh_alias
 
 unsetopt AUTO_CD
 
