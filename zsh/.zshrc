@@ -331,8 +331,10 @@ __fzf_bitwarden_search() {
 
   # Fetch items once into a variable, then hand to fzf (avoids slow streaming pipe)
   local items selected item_id password
+  zle -M "  🔐 Fetching vault items…"
   items=$(bw list items 2>/dev/null \
     | jq -r '.[] | select(.type == 1) | "\(.id)\t\(.name)\t\(.login.username // "")"')
+  zle -M ""
 
   selected=$(printf '%s\n' "$items" \
     | fzf --prompt="Bitwarden> " --height=40% --reverse \
@@ -341,6 +343,7 @@ __fzf_bitwarden_search() {
   [[ -z "$selected" ]] && { zle redisplay; return }
 
   item_id=$(printf '%s' "$selected" | cut -f1)
+  zle -M "  🔑 Getting password…"
   password=$(bw get password "$item_id" 2>/dev/null)
 
   local msg
