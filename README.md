@@ -40,7 +40,7 @@ stow -R zsh
 ## Setup on a new machine
 
 ```bash
-git clone <your-repo-url> ~/dotfiles
+git clone https://github.com/timvi402/dotfiles ~/dotfiles
 cd ~/dotfiles
 stow */
 ```
