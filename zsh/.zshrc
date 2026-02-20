@@ -144,6 +144,7 @@ autoload -U compinit -d $XDG_CACHE_HOME/zsh/zcompdump/.zcomdump
 # [[ ! -f ~/.zsh/.p10k.zsh ]] || source ~/.zsh/.p10k.zsh
  
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+[ -f ~/.zsh_bw_completion ] && source ~/.zsh_bw_completion
 
 # Tokyo Night theme for FZF
 [ -f ~/.oh-my-zsh/custom/themes/tokyo-night/tokyonight_night.sh ] && source ~/.oh-my-zsh/custom/themes/tokyo-night/tokyonight_night.sh
@@ -241,8 +242,6 @@ _fuzzy_project_cd() {
   zle -I
   __redraw_prompt
 
-  # Now launch Neovim without printing any command line
-  nvim +'Neotree reveal'
 }
 
 zle -N _fuzzy_project_cd
@@ -305,4 +304,67 @@ zle -N _dir_back
 zle -N _dir_forward
 bindkey '^[[1;3D' _dir_back     # Alt+ArrowLeft (browser-style)
 bindkey '^[[1;3C' _dir_forward  # Alt+ArrowRight (browser-style)
+
+
+# Ctrl+B fuzzy Bitwarden vault search
+__fzf_bitwarden_search() {
+  local bw_status
+  bw_status=$(bw status 2>/dev/null | jq -r '.status' 2>/dev/null)
+
+  if [[ "$bw_status" == "unauthenticated" ]]; then
+    echo "Bitwarden: not logged in. Run 'bw login' first."
+    zle redisplay
+    return
+  fi
+
+  if [[ "$bw_status" == "locked" ]]; then
+    zle -I  # Release terminal only when we need interactive unlock input
+    local session_key
+    session_key=$(bw unlock --raw </dev/tty)
+    if [[ $? -ne 0 || -z "$session_key" ]]; then
+      echo "Failed to unlock vault."
+      zle redisplay
+      return
+    fi
+    export BW_SESSION="$session_key"
+  fi
+
+  # Fetch items once into a variable, then hand to fzf (avoids slow streaming pipe)
+  local items selected item_id password
+  items=$(bw list items 2>/dev/null \
+    | jq -r '.[] | select(.type == 1) | "\(.id)\t\(.name)\t\(.login.username // "")"')
+
+  selected=$(printf '%s\n' "$items" \
+    | fzf --prompt="Bitwarden> " --height=40% --reverse \
+          --delimiter=$'\t' --with-nth=2,3)
+
+  [[ -z "$selected" ]] && { zle redisplay; return }
+
+  item_id=$(printf '%s' "$selected" | cut -f1)
+  password=$(bw get password "$item_id" 2>/dev/null)
+
+  local msg
+  if [[ -n "$password" ]]; then
+    if command -v wl-copy &>/dev/null; then
+      printf '%s' "$password" | wl-copy
+      msg="✓ Password copied to clipboard."
+    elif command -v xclip &>/dev/null; then
+      printf '%s' "$password" | xclip -selection clipboard
+      msg="✓ Password copied to clipboard."
+    elif command -v xsel &>/dev/null; then
+      printf '%s' "$password" | xsel --clipboard
+      msg="✓ Password copied to clipboard."
+    else
+      msg="✗ No clipboard utility found (wl-copy, xclip, xsel)"
+    fi
+  else
+    msg="✗ No password found for selected item."
+  fi
+
+  zle redisplay
+  zle -M "$msg"
+}
+
+zle -N __fzf_bitwarden_search
+bindkey '^B' __fzf_bitwarden_search
 
