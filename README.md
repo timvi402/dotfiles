@@ -9,7 +9,6 @@ Each directory represents a package that can be stowed independently:
 - `zsh/` - Zsh configuration  
 - `git/` - Git configuration
 - `nvim/` - Neovim configuration
-- `tmux/` - Tmux configuration
 - `kitty/` - Kitty terminal configuration
 
 ## Usage
