@@ -1,0 +1,4 @@
+# Bitwarden CLI (bw) zsh completions
+if command -v bw &>/dev/null; then
+  source <(bw completion --shell zsh)
+fi
