@@ -1,4 +1,5 @@
 # Aliases
+alias record='~/scripts/record.sh'
 alias ld='lazydocker'
 alias lg='lazygit'
 alias pw='pass-cli'

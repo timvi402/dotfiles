@@ -371,3 +371,6 @@ __fzf_bitwarden_search() {
 zle -N __fzf_bitwarden_search
 bindkey '^B' __fzf_bitwarden_search
 
+
+# zoxide
+eval "$(zoxide init --cmd cd zsh)"
