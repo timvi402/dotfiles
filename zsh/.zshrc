@@ -306,6 +306,26 @@ bindkey '^[[1;3D' _dir_back     # Alt+ArrowLeft (browser-style)
 bindkey '^[[1;3C' _dir_forward  # Alt+ArrowRight (browser-style)
 
 
+# Bitwarden session persistence
+_BW_SESSION_FILE="${XDG_RUNTIME_DIR:-$HOME/.cache}/bw_session"
+if [[ -f "$_BW_SESSION_FILE" ]]; then
+  export BW_SESSION="$(cat "$_BW_SESSION_FILE")"
+fi
+
+# Manual unlock helper — run once per login if needed
+bwu() {
+  local key
+  key=$(bw unlock --raw)
+  if [[ $? -eq 0 && -n "$key" ]]; then
+    export BW_SESSION="$key"
+    echo "$key" > "$_BW_SESSION_FILE"
+    chmod 600 "$_BW_SESSION_FILE"
+    echo "Vault unlocked."
+  else
+    echo "Failed to unlock vault."
+  fi
+}
+
 # Ctrl+B fuzzy Bitwarden vault search
 __fzf_bitwarden_search() {
   local bw_status
@@ -327,24 +347,35 @@ __fzf_bitwarden_search() {
       return
     fi
     export BW_SESSION="$session_key"
+    echo "$session_key" > "$_BW_SESSION_FILE"
+    chmod 600 "$_BW_SESSION_FILE"
   fi
 
-  # Fetch items once into a variable, then hand to fzf (avoids slow streaming pipe)
-  local items selected item_id password
+  # Fetch all needed data in one bw call (id, name, username, password)
+  local raw formatted selected item_id password
   zle -M "  🔐 Fetching vault items…"
-  items=$(bw list items 2>/dev/null \
-    | jq -r '.[] | select(.type == 1) | "\(.id)\t\(.name)\t\(.login.username // "")"')
+  zle -R
+  raw=$(bw list items 2>/dev/null \
+    | jq -r '.[] | select(.type == 1) | "\(.id)\t\(.name)\t\(.login.username // "")\t\(.login.password // "")"')
   zle -M ""
+  zle -R
 
-  selected=$(printf '%s\n' "$items" \
+  # Pad name column to align username into a second column (fields 1=id, 2=name, 3=user, 4=password)
+  local name_width
+  name_width=$(printf '%s\n' "$raw" | cut -f2 | awk '{ if (length > m) m = length } END { print m+2 }')
+  # formatted keeps id in field 1, display string in field 2 only (password stays in raw for lookup)
+  formatted=$(printf '%s\n' "$raw" \
+    | awk -F'\t' -v w="$name_width" '{ printf "%s\t%-*s%s\n", $1, w, $2, $3 }')
+
+  selected=$(printf '%s\n' "$formatted" \
     | fzf --prompt="Bitwarden> " --height=40% --reverse \
-          --delimiter=$'\t' --with-nth=2,3)
+          --delimiter=$'\t' --with-nth=2)
 
   [[ -z "$selected" ]] && { zle redisplay; return }
 
   item_id=$(printf '%s' "$selected" | cut -f1)
-  zle -M "  🔑 Getting password…"
-  password=$(bw get password "$item_id" 2>/dev/null)
+  # Look up password from already-fetched raw data — no second bw call needed
+  password=$(printf '%s\n' "$raw" | awk -F'\t' -v id="$item_id" '$1 == id { print $4; exit }')
 
   local msg
   if [[ -n "$password" ]]; then
