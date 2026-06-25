@@ -67,3 +67,4 @@ __fzf_bitwarden_search() {
 }
 
 bind -x '"\C-b": __fzf_bitwarden_search'
+. "$HOME/.cargo/env"
