@@ -402,6 +402,14 @@ __fzf_bitwarden_search() {
 zle -N __fzf_bitwarden_search
 bindkey '^B' __fzf_bitwarden_search
 
+# Launch Claude Code with Ctrl+å (kitty maps it to the CSI-u sequence \e[229;5u)
+__launch_claude() {
+  BUFFER="claude"
+  zle accept-line
+}
+zle -N __launch_claude
+bindkey '^[[229;5u' __launch_claude
+
 
 # zoxide
 eval "$(zoxide init --cmd cd zsh)"

@@ -2,5 +2,6 @@
 alias record='~/scripts/record.sh'
 alias ld='lazydocker'
 alias lg='lazygit'
+alias gs='git switch'
 alias pw='pass-cli'
 

@@ -22,8 +22,6 @@ map alt+up neighboring_window up
 map alt+down neighboring_window down
 map alt+left neighboring_window left
 map alt+right neighboring_window right
-# Ctrl+å sends CSI-u sequence for the zsh claude-launch widget (å = U+00E5 = 229)
-map ctrl+å send_text all \x1b[229;5u
 
 # Allow remote access
 allow_remote_control yes
