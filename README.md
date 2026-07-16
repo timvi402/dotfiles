@@ -6,10 +6,12 @@ My personal configuration files managed with GNU Stow.
 
 Each directory represents a package that can be stowed independently:
 - `bash/` - Bash configuration
-- `zsh/` - Zsh configuration  
+- `zsh/` - Zsh configuration
 - `git/` - Git configuration
 - `nvim/` - Neovim configuration
 - `kitty/` - Kitty terminal configuration
+- `matugen/` - Matugen config + templates (Chromium theme colour from wallpaper)
+- `omarchy/` - Overrides for omarchy commands, shadowed via `~/.local/bin`
 
 ## Usage
 

@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Overrides ~/.local/share/omarchy/bin/omarchy-theme-set-browser (~/.local/bin
+# wins in PATH). Chromium follows the wallpaper-derived material palette rather
+# than the omarchy theme color, so switching omarchy themes doesn't pull the
+# browser away from the rest of the desktop.
+#
+# Seeds with `primary_container`: Chromium bases the frame on this color fairly
+# directly, so the seed's lightness decides whether the browser reads light or
+# dark. `surface` is near-black (dark but colorless) and `primary` is a light
+# pastel (colorful but turns the whole browser light); primary_container carries
+# the wallpaper hue at a dark tone. Note omarchy's original also set
+# "BrowserColorScheme", which is NOT a real Chromium policy (absent from the
+# binary) and did nothing -- dropped, so lightness is controlled via the seed.
+# Keep in sync with [templates.chromium] in ~/.config/matugen/config.toml.
+
+COLORS_JSON="$HOME/.local/state/quickshell/user/generated/colors.json"
+POLICY_DIR=/etc/chromium/policies/managed
+
+[[ -f $COLORS_JSON && -w $POLICY_DIR ]] || exit 0
+
+color=$(jq -r '.primary_container // empty' "$COLORS_JSON")
+[[ $color =~ ^#[0-9a-fA-F]{6}$ ]] || exit 0
+
+printf '{"BrowserThemeColor": "%s"}\n' "$color" >"$POLICY_DIR/color.json"
+
+if pgrep -x chromium >/dev/null; then
+  chromium --refresh-platform-policy --no-startup-window &>/dev/null &
+fi
+
+exit 0
