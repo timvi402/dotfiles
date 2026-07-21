@@ -1,0 +1,183 @@
+# Password-manager fuzzy search (Ctrl+B → choose manager → fzf → copy password)
+# Sourced from .zshrc. Requires: fzf, jq, a clipboard tool (wl-copy/xclip/xsel),
+# and the respective CLI (`bw` for Bitwarden, `pass-cli` for Proton Pass).
+
+# Bitwarden session persistence
+_BW_SESSION_FILE="${XDG_RUNTIME_DIR:-$HOME/.cache}/bw_session"
+if [[ -f "$_BW_SESSION_FILE" ]]; then
+  export BW_SESSION="$(cat "$_BW_SESSION_FILE")"
+fi
+
+# Manual unlock helper — run once per login if needed
+bwu() {
+  local key
+  key=$(bw unlock --raw)
+  if [[ $? -eq 0 && -n "$key" ]]; then
+    export BW_SESSION="$key"
+    echo "$key" > "$_BW_SESSION_FILE"
+    chmod 600 "$_BW_SESSION_FILE"
+    echo "Vault unlocked."
+  else
+    echo "Failed to unlock vault."
+  fi
+}
+
+# Ctrl+B fuzzy Bitwarden vault search
+__fzf_bitwarden_search() {
+  local bw_status
+  bw_status=$(bw status 2>/dev/null | jq -r '.status' 2>/dev/null)
+
+  if [[ "$bw_status" == "unauthenticated" ]]; then
+    echo "Bitwarden: not logged in. Run 'bw login' first."
+    zle redisplay
+    return
+  fi
+
+  if [[ "$bw_status" == "locked" ]]; then
+    zle -I  # Release terminal only when we need interactive unlock input
+    local session_key
+    session_key=$(bw unlock --raw </dev/tty)
+    if [[ $? -ne 0 || -z "$session_key" ]]; then
+      echo "Failed to unlock vault."
+      zle redisplay
+      return
+    fi
+    export BW_SESSION="$session_key"
+    echo "$session_key" > "$_BW_SESSION_FILE"
+    chmod 600 "$_BW_SESSION_FILE"
+  fi
+
+  # Fetch all needed data in one bw call (id, name, username, password)
+  local raw formatted selected item_id password
+  zle -M "  🔐 Fetching vault items…"
+  zle -R
+  raw=$(bw list items 2>/dev/null \
+    | jq -r '.[] | select(.type == 1) | "\(.id)\t\(.name)\t\(.login.username // "")\t\(.login.password // "")"')
+  zle -M ""
+  zle -R
+
+  # Pad name column to align username into a second column (fields 1=id, 2=name, 3=user, 4=password)
+  local name_width
+  name_width=$(printf '%s\n' "$raw" | cut -f2 | awk '{ if (length > m) m = length } END { print m+2 }')
+  # formatted keeps id in field 1, display string in field 2 only (password stays in raw for lookup)
+  formatted=$(printf '%s\n' "$raw" \
+    | awk -F'\t' -v w="$name_width" '{ printf "%s\t%-*s%s\n", $1, w, $2, $3 }')
+
+  selected=$(printf '%s\n' "$formatted" \
+    | fzf --prompt="Bitwarden> " --height=40% --reverse \
+          --delimiter=$'\t' --with-nth=2)
+
+  [[ -z "$selected" ]] && { zle redisplay; return }
+
+  item_id=$(printf '%s' "$selected" | cut -f1)
+  # Look up password from already-fetched raw data — no second bw call needed
+  password=$(printf '%s\n' "$raw" | awk -F'\t' -v id="$item_id" '$1 == id { print $4; exit }')
+
+  local msg
+  if [[ -n "$password" ]]; then
+    if command -v wl-copy &>/dev/null; then
+      printf '%s' "$password" | wl-copy
+      msg="✓ Password copied to clipboard."
+    elif command -v xclip &>/dev/null; then
+      printf '%s' "$password" | xclip -selection clipboard
+      msg="✓ Password copied to clipboard."
+    elif command -v xsel &>/dev/null; then
+      printf '%s' "$password" | xsel --clipboard
+      msg="✓ Password copied to clipboard."
+    else
+      msg="✗ No clipboard utility found (wl-copy, xclip, xsel)"
+    fi
+  else
+    msg="✗ No password found for selected item."
+  fi
+
+  zle redisplay
+  zle -M "$msg"
+}
+
+# Proton Pass fuzzy search (pass-cli). No unlock step — session has no lock.
+__fzf_protonpass_search() {
+  local raw formatted selected password
+  zle -M "  🔐 Fetching Proton Pass items…"
+  zle -R
+
+  # One JSON fetch per vault (item list requires a vault); --show-secrets gives
+  # the password inline so no second lookup is needed on selection.
+  raw=$(pass-cli vault list --output json 2>/dev/null \
+    | jq -r '.vaults[].name' \
+    | while IFS= read -r vault; do
+        pass-cli item list --vault-name "$vault" --filter-type login \
+          --output json --show-secrets 2>/dev/null \
+        | jq -r --arg vault "$vault" '
+            .items[]
+            | ( (.content.content.Login.email // "") | gsub("^\\s+|\\s+$";"") ) as $email
+            | ( .content.content.Login.username // "" ) as $user
+            | ( if $email != "" then $email else $user end ) as $login
+            | [ $vault, .content.title, $login, .content.content.Login.password ]
+            | @tsv'
+      done)
+  zle -M ""
+  zle -R
+
+  if [[ -z "$raw" ]]; then
+    zle redisplay
+    zle -M "✗ Proton Pass: no items (try 'pass-cli test' / 'pass-cli login')."
+    return
+  fi
+
+  # Column widths: field 1 = vault (shown as [vault]), field 2 = title.
+  local vault_width title_width
+  vault_width=$(printf '%s\n' "$raw" | cut -f1 | awk '{ n=length+2; if (n>m) m=n } END { print m+1 }')
+  title_width=$(printf '%s\n' "$raw" | cut -f2 | awk '{ if (length>m) m=length } END { print m+2 }')
+
+  # formatted = "DISPLAY \t PASSWORD"; fzf shows field 1, password stays hidden.
+  formatted=$(printf '%s\n' "$raw" \
+    | awk -F'\t' -v vw="$vault_width" -v tw="$title_width" \
+        '{ printf "%-*s%-*s%s\t%s\n", vw, "["$1"]", tw, $2, $3, $4 }')
+
+  selected=$(printf '%s\n' "$formatted" \
+    | fzf --prompt="Proton Pass> " --height=40% --reverse \
+          --delimiter=$'\t' --with-nth=1)
+
+  [[ -z "$selected" ]] && { zle redisplay; return }
+
+  password=$(printf '%s' "$selected" | cut -f2)
+
+  local msg
+  if [[ -n "$password" ]]; then
+    if command -v wl-copy &>/dev/null; then
+      printf '%s' "$password" | wl-copy
+      msg="✓ Password copied to clipboard."
+    elif command -v xclip &>/dev/null; then
+      printf '%s' "$password" | xclip -selection clipboard
+      msg="✓ Password copied to clipboard."
+    elif command -v xsel &>/dev/null; then
+      printf '%s' "$password" | xsel --clipboard
+      msg="✓ Password copied to clipboard."
+    else
+      msg="✗ No clipboard utility found (wl-copy, xclip, xsel)"
+    fi
+  else
+    msg="✗ No password found for selected item."
+  fi
+
+  zle redisplay
+  zle -M "$msg"
+}
+
+# Ctrl+B: choose a password manager first, then fuzzy-search it.
+__fzf_pw_search() {
+  local choice
+  choice=$(printf '%s\n' "Bitwarden" "Proton Pass" \
+    | fzf --prompt="Vault> " --height=6 --reverse --header="Choose password manager")
+  case "$choice" in
+    "Bitwarden")   __fzf_bitwarden_search ;;
+    "Proton Pass") __fzf_protonpass_search ;;
+    *) zle redisplay ;;
+  esac
+}
+
+zle -N __fzf_bitwarden_search
+zle -N __fzf_protonpass_search
+zle -N __fzf_pw_search
+bindkey '^B' __fzf_pw_search
