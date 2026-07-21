@@ -31,6 +31,10 @@ output_path = '~/.config/fuzzel/fuzzel_theme.ini'
 input_path = '~/.config/matugen/templates/ncspot/config.toml'
 output_path = '~/.config/ncspot/config.toml'
 
+[templates.zen]
+input_path = '~/.config/matugen/templates/zen/zen-matugen.css'
+output_path = '~/.config/zen/rrc9mbf1.Default (release)/chrome/zen-matugen.css'
+
 [templates.gtk3]
 input_path = '~/.config/matugen/templates/gtk-3.0/gtk.css'
 output_path = '~/.config/gtk-3.0/gtk.css'
