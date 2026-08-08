@@ -152,6 +152,11 @@ autoload -U compinit -d $XDG_CACHE_HOME/zsh/zcompdump/.zcomdump
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
+# Contrast fixes for the segment colors above, kept separate so that rerunning
+# `p10k configure` cannot silently undo them. Must stay after the line above:
+# ~/.p10k.zsh begins by unsetting every POWERLEVEL9K_* parameter.
+[[ ! -f ~/.p10k-colors.zsh ]] || source ~/.p10k-colors.zsh
+
 
 # Redraw prompt after changing directory inside a ZLE widget
 # Pattern taken from fzf's own integration.

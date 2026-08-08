@@ -387,11 +387,22 @@
     fi
 
     # Styling for different parts of Git status.
-    local       meta='%7F' # white foreground
-    local      clean='%0F' # black foreground
-    local   modified='%0F' # black foreground
-    local  untracked='%0F' # black foreground
-    local conflicted='%1F' # red foreground
+    #
+    # The vcs chip's background is green or yellow, straight from the Omarchy
+    # theme (see POWERLEVEL9K_VCS_*_BACKGROUND above — matugen leaves those two
+    # slots alone on purpose). Both are light, so every part has to be dark to be
+    # readable: `meta` was %7F and `conflicted` was %1F, and since matugen took
+    # over the palette those resolve to a light grey and a light salmon, landing
+    # at ~1.1:1 on green.
+    #
+    # Conflict state is therefore carried by weight rather than by hue. Each
+    # style below sets color *and* weight so that whichever one is applied last
+    # fully describes the run, and bold cannot leak into the counts that follow.
+    local       meta='%0F%b' # dark foreground
+    local      clean='%0F%b' # dark foreground
+    local   modified='%0F%b' # dark foreground
+    local  untracked='%0F%b' # dark foreground
+    local conflicted='%0F%B' # dark foreground, bold
 
     local res
 
