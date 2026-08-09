@@ -1,0 +1,67 @@
+# fzf appearance — framed "panel" style, colors follow the active omarchy theme.
+#
+# Every color below is an ANSI name (or -1 = terminal default) instead of a hex
+# value, so `omarchy-theme-set` re-themes fzf along with the terminal — no
+# regeneration step and nothing to keep in sync.
+#
+# Sourced from .zshrc; replaces the hardcoded tokyonight_night.sh palette.
+
+export FZF_DEFAULT_OPTS="
+--style=full:rounded
+--border=none
+--layout=reverse
+--height=80%
+--min-height=20+
+--ansi
+--highlight-line
+--cycle
+--scroll-off=3
+--info=right
+--no-separator
+--footer-border=line
+--prompt='  '
+--pointer='▎'
+--marker='◆'
+--gutter=' '
+--ellipsis='…'
+--scrollbar='│'
+--preview-window='right,55%,wrap,noinfo'
+--color=fg:-1,bg:-1,gutter:-1,query:-1:regular
+--color=fg+:bright-white,bg+:black,hl:cyan,hl+:bright-cyan:bold
+--color=prompt:blue:bold,pointer:magenta,marker:magenta,spinner:magenta
+--color=info:bright-black,separator:bright-black,scrollbar:bright-black
+--color=border:bright-black,preview-border:bright-black,list-border:bright-black
+--color=input-border:bright-black,header-border:bright-black
+--color=footer:bright-black,footer-border:bright-black
+--color=label:blue,preview-label:blue,header:yellow
+--bind='ctrl-/:toggle-preview'
+--bind='alt-up:preview-half-page-up,alt-down:preview-half-page-down'
+"
+
+# Build a footer hint line from "key description" pairs:
+#   _fzf_footer enter 'open in nvim' ctrl-/ 'toggle preview'
+# The keys are printed bold so the line scans as a list of bindings rather than
+# as a sentence. fzf restores the dim footer color after each reset.
+_fzf_footer() {
+  local out key desc
+  while (( $# >= 2 )); do
+    key=$1 desc=$2; shift 2
+    # Bold bright-white: fzf replaces a "default foreground" with its own dim
+    # footer color, so the key needs an explicit one to stand out. Bright white
+    # rather than plain white — the latter is a muted grey in most palettes and
+    # would barely separate from the dimmed description text.
+    out+="${out:+ · }"$'\e[1;97m'"$key"$'\e[0m'" $desc"
+  done
+  print -r -- "$out"
+}
+
+# bat's 'ansi' theme paints with the 16 terminal colors, so file previews stay
+# in step with the omarchy theme too.
+export BAT_THEME="ansi"
+
+# Preview commands shared by the widgets in .zshrc, kept here so the look of a
+# file / directory preview is defined in exactly one place.
+# `timeout` guards the pane: eza can stall on the odd directory, and a preview
+# that never returns leaves the pane empty with no way to tell why.
+export FZF_PREVIEW_FILE='timeout 2 bat --style=numbers --color=always --line-range=:300 {} 2>/dev/null || cat {}'
+export FZF_PREVIEW_DIR='timeout 2 eza -a --icons=always --color=always --group-directories-first {} 2>/dev/null || ls -A {}'

@@ -1,3 +1,6 @@
+# Iris Autocomplete
+eval "$(iris init zsh)"
+
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
@@ -127,8 +130,8 @@ export PATH=$HOME/.local/bin:$HOME/.dotnet/tools:$PATH
 ZSH_COMPDUMP="$XDG_CACHE_HOME/zsh/zcompdump/.zcomdump"
 
 
-# Set list of plugins
-plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete)
+
+# plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-autocomplete)
 
 source $ZSH/oh-my-zsh.sh
 
@@ -146,8 +149,8 @@ autoload -U compinit -d $XDG_CACHE_HOME/zsh/zcompdump/.zcomdump
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 [ -f ~/.zsh_bw_completion ] && source ~/.zsh_bw_completion
 
-# Tokyo Night theme for FZF
-[ -f ~/.oh-my-zsh/custom/themes/tokyo-night/tokyonight_night.sh ] && source ~/.oh-my-zsh/custom/themes/tokyo-night/tokyonight_night.sh
+# FZF look & feel — framed panels, colors follow the active omarchy theme
+[ -f ~/.zsh_fzf_theme ] && source ~/.zsh_fzf_theme
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
@@ -174,7 +177,15 @@ __redraw_prompt() {
 # Ctrl+F fuzzy file finder
 __fzf_file_finder() {
   local selected
-  selected=$(find . -type f 2>/dev/null | fzf --prompt="Find file> " --preview='cat {}' --preview-window=right:50%:wrap 2>/dev/null)
+  selected=$(
+    fd --type f --hidden --exclude .git 2>/dev/null |
+    fzf --input-label='  files ' \
+        --list-label=" ${PWD/#$HOME/~} " \
+        --preview="$FZF_PREVIEW_FILE" \
+        --preview-label='  preview ' \
+        --footer="$(_fzf_footer enter 'open in nvim' ctrl-/ 'toggle preview')" \
+        2>/dev/null
+  )
   if [[ -n "$selected" ]]; then
     nvim "$selected"
     zle .reset-prompt
@@ -189,7 +200,17 @@ bindkey '^F' __fzf_file_finder
 # Ctrl+H fuzzy history search
 __fzf_history_search() {
   local selected
-  selected=$(fc -rl 1 | awk '{$1=""; print substr($0,2)}' | fzf --prompt="History> " --tac --no-sort --exact 2>/dev/null)
+  selected=$(
+    fc -rl 1 | awk '{$1=""; print substr($0,2)}' |
+    fzf --input-label='  history ' \
+        --list-label=' commands ' \
+        --tac --no-sort --exact \
+        --preview='echo {}' \
+        --preview-window='down,3,wrap' \
+        --preview-label=' full command ' \
+        --footer="$(_fzf_footer enter 'put on command line' esc 'cancel')" \
+        2>/dev/null
+  )
   if [[ -n "$selected" ]]; then
     BUFFER="$selected"
     CURSOR=$#BUFFER
@@ -206,10 +227,12 @@ __fzf_dir_finder() {
   local selected
 
   selected=$(
-    find . -type d 2>/dev/null |
-    fzf --prompt="Find directory> " \
-        --preview='ls -lah {}' \
-        --preview-window=right:50%:wrap
+    fd --type d --hidden --exclude .git 2>/dev/null |
+    fzf --input-label='  directories ' \
+        --list-label=" ${PWD/#$HOME/~} " \
+        --preview="$FZF_PREVIEW_DIR" \
+        --preview-label='  contents ' \
+        --footer="$(_fzf_footer enter 'cd into directory' ctrl-/ 'toggle preview')"
   ) || { zle redisplay; return }
 
   [[ -n $selected ]] || { zle redisplay; return }
@@ -236,7 +259,15 @@ _fuzzy_project_cd() {
         -mindepth 1 -maxdepth 3 \
         -type d -name .git -prune 2>/dev/null \
       | sed 's|/\.git$||'
-    } | sort -u | sed "s|^$PROJECT_ROOT/||" | fzf --prompt="Project > " --height=40% --reverse
+    } | sort -u | sed "s|^$PROJECT_ROOT/||" |
+    fzf --input-label='  projects ' \
+        --list-label=" ${PROJECT_ROOT/#$HOME/~} " \
+        --preview='cd "$PROJECT_ROOT"/{} 2>/dev/null && {
+                     timeout 2 git -c color.ui=always log --oneline --decorate -n 8 2>/dev/null && echo;
+                     timeout 2 eza -a --icons=always --color=always --group-directories-first 2>/dev/null || ls -A;
+                   }' \
+        --preview-label='  recent commits ' \
+        --footer="$(_fzf_footer enter 'cd into project' ctrl-/ 'toggle preview')"
   ) || { zle redisplay; return }
 
   [[ -n $selection ]] || { zle redisplay; return }
@@ -312,6 +343,42 @@ bindkey '^[[1;3C' _dir_forward  # Alt+ArrowRight (browser-style)
 
 # Password-manager fuzzy search (Ctrl+B) — see ~/.zsh_pw_search
 [ -f ~/.zsh_pw_search ] && source ~/.zsh_pw_search
+
+
+# Keep Iris' suggestion overlay out of the fzf pickers.
+#
+# Iris (the autocomplete wrapper eval'd at the top of this file) learns that the
+# terminal is busy from the preexec/precmd hooks it installs — but a ZLE widget
+# never fires either one, so from Iris' point of view we are still sitting at the
+# prompt and it happily paints suggestions on top of a full-screen fzf.
+#
+# The fix is to hand Iris the same markers its own hooks send, around the widget.
+# Both are NUL-terminated writes to $IRIS_FD, the descriptor `iris init zsh`
+# exports; when Iris isn't running the variable is unset and these are no-ops, so
+# the config still works in a plain shell (or under IRIS_RESCUE=1).
+_iris_suspend() { [[ -n $IRIS_FD ]] && print -u $IRIS_FD -N -r -- "IRIS_CMD_START" 2>/dev/null }
+_iris_resume()  { [[ -n $IRIS_FD ]] && print -u $IRIS_FD -N -r -- "IRIS_CMD_STOP:0" 2>/dev/null }
+
+# One wrapper serves every picker: ZLE sets $WIDGET to the name of the widget
+# being run, and each of these widgets was registered under the same name as its
+# function — so "$WIDGET" calls the original body. Registering the wrapper with
+# `zle -N <name> _iris_quiet_widget` leaves that function untouched.
+_iris_quiet_widget() {
+  _iris_suspend
+  "$WIDGET" "$@"
+  local ret=$?
+  _iris_resume
+  return $ret
+}
+
+# Re-register the screen-grabbing widgets through the wrapper. Guarded on the
+# function existing, since ~/.zsh_pw_search is sourced conditionally above.
+for _iris_w in __fzf_file_finder __fzf_dir_finder __fzf_history_search \
+               _fuzzy_project_cd __fzf_pw_search; do
+  (( $+functions[$_iris_w] )) && zle -N $_iris_w _iris_quiet_widget
+done
+unset _iris_w
+
 
 # Launch Claude Code with Ctrl+å (kitty maps it to the CSI-u sequence \e[229;5u)
 __launch_claude() {
