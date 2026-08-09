@@ -25,8 +25,12 @@ Three files exist on this machine and in no repository at all:
 `border-colors.conf` is load-bearing: it is what makes matugen own Hyprland's
 border colors, and therefore what replaces omarchy's theme in this design.
 
-The remaining templates are byte-identical copies of upstream dots-hyprland,
-placed by its installer, and are reproducible.
+The remaining templates are byte-identical copies of dots-hyprland's, placed by
+its installer, and are reproducible.
+
+Tracing a single `switchwall.sh` call then surfaced a fourth untracked file
+outside matugen — `~/.local/bin/omarchy-theme-bg-set` — which is what drives the
+wallpaper pipeline. See B5. Eight orphans in total, from two ad-hoc checks.
 
 ## Constraints
 
@@ -75,7 +79,7 @@ and it is idempotent largely for free: `pacman -S --needed`, `stow --restow`,
 Ansible was considered and rejected: it buys most of its value across many
 machines, and would roughly triple the line count in YAML while adding a Python
 bootstrap step. Nix would mean abandoning pacman/AUR for the shell stack, making
-upstream's meta-packages dead weight. chezmoi solves the other half — templating
+the dependency meta-packages dead weight. chezmoi solves the other half — templating
 and per-machine variance — and would replace stow rather than the installer.
 
 **Structural rule against bash rot:** package sets live in plain-text list files,
