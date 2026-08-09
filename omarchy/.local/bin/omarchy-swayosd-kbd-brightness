@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Override of omarchy's own omarchy-swayosd-kbd-brightness, shadowing it via ~/.local/bin
+# coming before ~/.local/share/omarchy/bin on PATH.
+#
+# omarchy-brightness-keyboard still owns the hardware, stepping
+# /sys/class/leds/*kbd_backlight* with brightnessctl. This only moves the readout to the
+# quickshell (ii) OSD so it matches the shell.
+#
+# ii has no keyboard backlight support of its own; KeyboardBacklight is write only from
+# out here and just holds the level it was last told about so the OSD can show it.
+#
+# Delete this file to go back to SwayOSD.
+
+percent="$1"
+
+qs -c ii ipc call keyboardBacklight notify "$percent" >/dev/null 2>&1
