@@ -10,6 +10,20 @@ input_path = '~/.config/matugen/templates/chromium/color.json'
 output_path = '/etc/chromium/policies/managed/color.json'
 post_hook = 'pgrep -x chromium >/dev/null && chromium --refresh-platform-policy --no-startup-window &>/dev/null || true'
 
+# kitty is included last in kitty.conf so it overrides the Omarchy theme palette.
+# SIGUSR1 makes a running kitty re-read its config; `|| true` keeps matugen from
+# reporting a failure when no kitty is open.
+[templates.kitty]
+input_path = '~/.config/matugen/templates/kitty/colors.conf'
+output_path = '~/.config/kitty/colors-matugen.conf'
+post_hook = 'pkill -USR1 -x kitty 2>/dev/null || true'
+
+# Iris re-reads its theme file on every render, so no post_hook is needed —
+# open shells pick the new colors up on the next keystroke.
+[templates.iris]
+input_path = '~/.config/matugen/templates/iris/theme.toml'
+output_path = '~/.config/iris/theme.toml'
+
 [templates.hyprland]
 input_path = '~/.config/matugen/templates/hyprland/colors.lua'
 output_path = '~/.config/hypr/hyprland/colors.lua'
