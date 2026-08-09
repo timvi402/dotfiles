@@ -41,11 +41,12 @@ migration is a separate, deliberate act with its own risk profile.
 
 ## Scope
 
-In scope: Hyprland, quickshell (`ii` + `bar`), kitty, matugen theming, zsh, and
-CLI tooling (nvim, yazi, fzf, and similar).
+In scope: Hyprland, quickshell (`ii`), kitty, matugen theming, zsh, and CLI
+tooling (nvim, yazi, fzf, and similar).
 
-Out of scope: GUI applications (Signal, Spotify, 1Password, Teams webapps).
-These are personal rather than structural.
+Out of scope: GUI applications (Signal, Spotify, 1Password, Teams webapps) —
+personal rather than structural. Also the `bar` shell, and migrating the host off
+omarchy.
 
 ## Decisions
 
@@ -54,7 +55,8 @@ These are personal rather than structural.
 | Decoupling depth | Fully omarchy-free |
 | Hypr defaults | Vendor into `~/dotfiles` |
 | Theming | matugen replaces omarchy's theme dir as source of truth |
-| `omarchy-menu` (891 lines) | Drop; rewire bar's call sites |
+| `omarchy-menu` (891 lines) | Not vendored. With `bar` archived it has no live call sites — the only other references are already-commented hypr bindings |
+| `bar` / qs-config | Archived, out of scope |
 | VM provisioning | Official Arch cloud image + cloud-init |
 | Script location | Inside `~/dotfiles`, staged and idempotent |
 | Implementation | Thin bash + plain-text package lists |
