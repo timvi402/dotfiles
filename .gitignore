@@ -2,3 +2,8 @@
 .DS_Store
 *~
 *.swp
+
+# ~/.config/kitty is a folded stow symlink into this package, so matugen writes
+# its generated palette here. It is derived from the current wallpaper, not
+# configuration, and changes on every wallpaper switch.
+kitty/.config/kitty/colors-matugen.conf
