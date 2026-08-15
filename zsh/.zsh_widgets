@@ -1,0 +1,231 @@
+# ZLE widgets and key bindings — sourced from .zshrc.
+#
+# Requires: fzf, fd, and the helpers from ~/.zsh_fzf_theme (_fzf_footer,
+# FZF_PREVIEW_FILE, FZF_PREVIEW_DIR), so it must be sourced after that file.
+# Must also come after ~/.zsh_pw_search, so the Iris wrapper at the bottom can
+# re-register that file's picker along with the ones defined here.
+#
+#   Ctrl+F       fuzzy file finder      → open in nvim
+#   Ctrl+H       fuzzy history search   → put on command line
+#   Ctrl+D       fuzzy directory finder → cd
+#   Ctrl+P       fuzzy project finder   → cd, scans $PROJECT_ROOT
+#   Alt+←/→      browser-style directory back / forward
+#   Ctrl+å       launch Claude Code
+
+# Redraw prompt after changing directory inside a ZLE widget.
+# Pattern taken from fzf's own integration.
+__redraw_prompt() {
+  local precmd
+  for precmd in $precmd_functions; do
+    $precmd           # run all precmd hooks (Powerlevel10k updates here)
+  done
+  zle .reset-prompt   # recompute prompt
+  zle -R              # repaint
+}
+
+# ---------------------------------------------------------------------------
+# fzf pickers
+# ---------------------------------------------------------------------------
+
+# Ctrl+F fuzzy file finder
+__fzf_file_finder() {
+  local selected
+  selected=$(
+    fd --type f --hidden --exclude .git 2>/dev/null |
+    fzf --input-label='  files ' \
+        --list-label=" ${PWD/#$HOME/~} " \
+        --preview="$FZF_PREVIEW_FILE" \
+        --preview-label='  preview ' \
+        --footer="$(_fzf_footer enter 'open in nvim' ctrl-/ 'toggle preview')" \
+        2>/dev/null
+  )
+  if [[ -n "$selected" ]]; then
+    nvim "$selected"
+    zle .reset-prompt
+  fi
+}
+zle -N __fzf_file_finder
+bindkey '^F' __fzf_file_finder
+
+# Ctrl+H fuzzy history search
+__fzf_history_search() {
+  local selected
+  selected=$(
+    fc -rl 1 | awk '{$1=""; print substr($0,2)}' |
+    fzf --input-label='  history ' \
+        --list-label=' commands ' \
+        --tac --no-sort --exact \
+        --preview='echo {}' \
+        --preview-window='down,3,wrap' \
+        --preview-label=' full command ' \
+        --footer="$(_fzf_footer enter 'put on command line' esc 'cancel')" \
+        2>/dev/null
+  )
+  if [[ -n "$selected" ]]; then
+    BUFFER="$selected"
+    CURSOR=$#BUFFER
+    zle redisplay
+  fi
+}
+zle -N __fzf_history_search
+bindkey '^H' __fzf_history_search
+
+# Ctrl+D fuzzy directory finder
+__fzf_dir_finder() {
+  local selected
+  selected=$(
+    fd --type d --hidden --exclude .git 2>/dev/null |
+    fzf --input-label='  directories ' \
+        --list-label=" ${PWD/#$HOME/~} " \
+        --preview="$FZF_PREVIEW_DIR" \
+        --preview-label='  contents ' \
+        --footer="$(_fzf_footer enter 'cd into directory' ctrl-/ 'toggle preview')"
+  ) || { zle redisplay; return }
+
+  [[ -n $selected ]] || { zle redisplay; return }
+
+  # Change directory quietly
+  builtin cd -- "$selected" 2>/dev/null || { zle redisplay; return }
+
+  # Clean up and redraw the prompt (including P10k path segment)
+  zle -I
+  __redraw_prompt
+}
+zle -N __fzf_dir_finder
+bindkey '^D' __fzf_dir_finder
+
+# Ctrl+P fuzzy project finder — git checkouts under $PROJECT_ROOT
+_fuzzy_project_cd() {
+  local selection
+  selection=$(
+    {
+      command find "$PROJECT_ROOT" \
+        -mindepth 1 -maxdepth 3 \
+        -type d -name .git -prune 2>/dev/null \
+      | sed 's|/\.git$||'
+    } | sort -u | sed "s|^$PROJECT_ROOT/||" |
+    fzf --input-label='  projects ' \
+        --list-label=" ${PROJECT_ROOT/#$HOME/~} " \
+        --preview='cd "$PROJECT_ROOT"/{} 2>/dev/null && {
+                     timeout 2 git -c color.ui=always log --oneline --decorate -n 8 2>/dev/null && echo;
+                     timeout 2 eza -a --icons=always --color=always --group-directories-first 2>/dev/null || ls -A;
+                   }' \
+        --preview-label='  recent commits ' \
+        --footer="$(_fzf_footer enter 'cd into project' ctrl-/ 'toggle preview')"
+  ) || { zle redisplay; return }
+
+  [[ -n $selection ]] || { zle redisplay; return }
+
+  # Reconstruct full path for cd
+  builtin cd -- "$PROJECT_ROOT/$selection" 2>/dev/null || { zle redisplay; return }
+
+  zle -I
+  __redraw_prompt
+}
+zle -N _fuzzy_project_cd
+bindkey '^P' _fuzzy_project_cd
+
+# ---------------------------------------------------------------------------
+# Browser-style directory navigation (Alt+Arrow)
+# ---------------------------------------------------------------------------
+# Back pops the AUTO_PUSHD stack (set up in .zshrc); forward replays what back
+# left behind.
+typeset -g -a _dir_forward_stack
+
+# Clear forward stack when changing directory normally
+_clear_forward_stack() {
+  _dir_forward_stack=()
+}
+chpwd_functions+=(_clear_forward_stack)
+
+_dir_back() {
+  if ! builtin popd -q 2>/dev/null; then
+    # Empty stack or error – stay silent
+    zle -I
+    zle redisplay
+    return 0
+  fi
+
+  # Save the directory we just left to forward stack
+  _dir_forward_stack+=("$OLDPWD")
+
+  zle -I
+  __redraw_prompt
+}
+
+_dir_forward() {
+  # Only allow forward if we have entries in the forward stack
+  if [[ ${#_dir_forward_stack[@]} -eq 0 ]]; then
+    zle -I
+    zle redisplay
+    return 0
+  fi
+
+  # Get the last directory from forward stack
+  local target="${_dir_forward_stack[-1]}"
+  _dir_forward_stack[-1]=()
+
+  # Push current dir and change to target
+  builtin pushd -q "$target" 2>/dev/null || {
+    zle -I
+    zle redisplay
+    return 0
+  }
+
+  zle -I
+  __redraw_prompt
+}
+
+zle -N _dir_back
+zle -N _dir_forward
+bindkey '^[[1;3D' _dir_back     # Alt+ArrowLeft (browser-style)
+bindkey '^[[1;3C' _dir_forward  # Alt+ArrowRight (browser-style)
+
+# ---------------------------------------------------------------------------
+# Misc bindings
+# ---------------------------------------------------------------------------
+
+# Launch Claude Code with Ctrl+å (kitty maps it to the CSI-u sequence \e[229;5u)
+__launch_claude() {
+  BUFFER="claude"
+  zle accept-line
+}
+zle -N __launch_claude
+bindkey '^[[229;5u' __launch_claude
+
+# ---------------------------------------------------------------------------
+# Iris integration
+# ---------------------------------------------------------------------------
+# Keep Iris' suggestion overlay out of the fzf pickers.
+#
+# Iris (the autocomplete wrapper eval'd at the top of .zshrc) learns that the
+# terminal is busy from the preexec/precmd hooks it installs — but a ZLE widget
+# never fires either one, so from Iris' point of view we are still sitting at the
+# prompt and it happily paints suggestions on top of a full-screen fzf.
+#
+# The fix is to hand Iris the same markers its own hooks send, around the widget.
+# Both are NUL-terminated writes to $IRIS_FD, the descriptor `iris init zsh`
+# exports; when Iris isn't running the variable is unset and these are no-ops, so
+# the config still works in a plain shell (or under IRIS_RESCUE=1).
+_iris_suspend() { [[ -n $IRIS_FD ]] && print -u $IRIS_FD -N -r -- "IRIS_CMD_START" 2>/dev/null }
+_iris_resume()  { [[ -n $IRIS_FD ]] && print -u $IRIS_FD -N -r -- "IRIS_CMD_STOP:0" 2>/dev/null }
+
+# One wrapper serves every picker: ZLE sets $WIDGET to the name of the widget
+# being run, and each of these widgets was registered under the same name as its
+# function — so "$WIDGET" calls the original body. Registering the wrapper with
+# `zle -N <name> _iris_quiet_widget` leaves that function untouched.
+_iris_quiet_widget() {
+  _iris_suspend
+  "$WIDGET" "$@"
+  local ret=$?
+  _iris_resume
+  return $ret
+}
+
+# Re-register the screen-grabbing widgets through the wrapper. Guarded on the
+# function existing, since ~/.zsh_pw_search is sourced conditionally in .zshrc.
+for _iris_w in __fzf_file_finder __fzf_dir_finder __fzf_history_search \
+               _fuzzy_project_cd __fzf_pw_search; do
+  (( $+functions[$_iris_w] )) && zle -N $_iris_w _iris_quiet_widget
+done
+unset _iris_w

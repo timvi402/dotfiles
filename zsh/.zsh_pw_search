@@ -15,6 +15,31 @@ _pw_missing_deps() {
   return 1
 }
 
+# Copy a password to the clipboard, leaving the user-facing result in $REPLY.
+# Returns non-zero when nothing was copied, so a caller can skip any follow-up
+# it only wants to do on a successful copy.
+_pw_copy_password() {
+  local password="$1"
+
+  if [[ -z "$password" ]]; then
+    REPLY="✗ No password found for selected item."
+    return 1
+  fi
+
+  if command -v wl-copy &>/dev/null; then
+    printf '%s' "$password" | wl-copy
+  elif command -v xclip &>/dev/null; then
+    printf '%s' "$password" | xclip -selection clipboard
+  elif command -v xsel &>/dev/null; then
+    printf '%s' "$password" | xsel --clipboard
+  else
+    REPLY="✗ No clipboard utility found (wl-copy, xclip, xsel)"
+    return 1
+  fi
+
+  REPLY="✓ Password copied to clipboard."
+}
+
 # Bitwarden session persistence
 _BW_SESSION_FILE="${XDG_RUNTIME_DIR:-$HOME/.cache}/bw_session"
 if [[ -f "$_BW_SESSION_FILE" ]]; then
@@ -139,26 +164,11 @@ __fzf_bitwarden_search() {
 
   password=$(printf '%s' "$selected" | cut -f2)
 
-  local msg
-  if [[ -n "$password" ]]; then
-    if command -v wl-copy &>/dev/null; then
-      printf '%s' "$password" | wl-copy
-      msg="✓ Password copied to clipboard."
-    elif command -v xclip &>/dev/null; then
-      printf '%s' "$password" | xclip -selection clipboard
-      msg="✓ Password copied to clipboard."
-    elif command -v xsel &>/dev/null; then
-      printf '%s' "$password" | xsel --clipboard
-      msg="✓ Password copied to clipboard."
-    else
-      msg="✗ No clipboard utility found (wl-copy, xclip, xsel)"
-    fi
-  else
-    msg="✗ No password found for selected item."
-  fi
+  local REPLY
+  _pw_copy_password "$password"
 
   zle redisplay
-  zle -M "$msg"
+  zle -M "$REPLY"
 }
 
 # Proton Pass "frecency": item_id → epoch of the last copy made through this
@@ -249,27 +259,11 @@ __fzf_protonpass_search() {
   password=$(printf '%s' "$selected" | cut -f2)
   id=$(printf '%s' "$selected" | cut -f3)
 
-  local msg
-  if [[ -n "$password" ]]; then
-    if command -v wl-copy &>/dev/null; then
-      printf '%s' "$password" | wl-copy
-      msg="✓ Password copied to clipboard."
-    elif command -v xclip &>/dev/null; then
-      printf '%s' "$password" | xclip -selection clipboard
-      msg="✓ Password copied to clipboard."
-    elif command -v xsel &>/dev/null; then
-      printf '%s' "$password" | xsel --clipboard
-      msg="✓ Password copied to clipboard."
-    else
-      msg="✗ No clipboard utility found (wl-copy, xclip, xsel)"
-    fi
-    [[ "$msg" == ✓* ]] && _pp_record_use "$id"
-  else
-    msg="✗ No password found for selected item."
-  fi
+  local REPLY
+  _pw_copy_password "$password" && _pp_record_use "$id"
 
   zle redisplay
-  zle -M "$msg"
+  zle -M "$REPLY"
 }
 
 # Ctrl+B: choose a password manager first, then fuzzy-search it.
