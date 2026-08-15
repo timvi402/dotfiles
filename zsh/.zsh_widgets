@@ -98,12 +98,16 @@ bindkey '^D' __fzf_dir_finder
 _fuzzy_project_cd() {
   local selection
   selection=$(
-    {
-      command find "$PROJECT_ROOT" \
-        -mindepth 1 -maxdepth 3 \
-        -type d -name .git -prune 2>/dev/null \
-      | sed 's|/\.git$||'
-    } | sort -u | sed "s|^$PROJECT_ROOT/||" |
+    # --no-ignore is load-bearing, not cosmetic: fd skips .git directories by
+    # default, so without it this search matches nothing and the picker opens
+    # empty. It also restores fd to find's semantics for .gitignore'd projects.
+    # --base-directory yields paths already relative to $PROJECT_ROOT, so the
+    # root no longer has to be interpolated into a sed pattern unescaped.
+    # fd prints directories with a trailing slash, hence the optional / below.
+    # sort also fixes the order, which fd's parallel walker does not guarantee.
+    fd --hidden --no-ignore --type d --max-depth 3 --prune \
+       --base-directory "$PROJECT_ROOT" '^\.git$' 2>/dev/null \
+    | sed 's|/\.git/\?$||' | sort -u |
     fzf --input-label='  projects ' \
         --list-label=" ${PROJECT_ROOT/#$HOME/~} " \
         --preview='cd "$PROJECT_ROOT"/{} 2>/dev/null && {
