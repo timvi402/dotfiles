@@ -1,0 +1,3 @@
+#%PAM-1.0
+auth       required   pam_u2f.so cue authfile=/etc/fido2/fido2
+account    include    system-local-login
