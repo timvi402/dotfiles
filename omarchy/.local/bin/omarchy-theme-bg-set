@@ -1,0 +1,20 @@
+#!/bin/bash
+# Wrapper: call original then sync wallpaper to ii shell + regenerate M3 colors
+
+~/.local/share/omarchy/bin/omarchy-theme-bg-set "$@"
+EXIT=$?
+[[ $EXIT -ne 0 ]] && exit $EXIT
+
+BG=$(readlink -f "$HOME/.config/omarchy/current/background" 2>/dev/null)
+[[ -z "$BG" || ! -f "$BG" ]] && exit 0
+
+CONFIG="$HOME/.config/illogical-impulse/config.json"
+if [ -f "$CONFIG" ] && command -v jq &>/dev/null; then
+    tmp=$(mktemp)
+    jq --arg p "$BG" '.background.wallpaperPath = $p' "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
+fi
+
+if command -v matugen &>/dev/null; then
+    mkdir -p "$HOME/.local/state/quickshell/user/generated/wallpaper"
+    matugen --prefer saturation image "$BG" 2>/dev/null
+fi

@@ -1,4 +1,4 @@
-include ~/.local/state/omarchy/current/theme/kitty.conf
+include ~/.config/omarchy/current/theme/kitty.conf
 
 # Font
 font_family JetBrainsMono Nerd Font
@@ -9,19 +9,11 @@ font_size        12.0
 background_opacity 0.8
 window_padding_width 14
 hide_window_decorations yes
-# Negative, not 0: only confirm when a window has a command actually running.
-# Shell integration is on (no-cursor disables the cursor shaping only, not the
-# integration), so windows sitting at an idle prompt are not counted and close
-# without a prompt. A stray Super+Q over something long-running asks first.
-confirm_os_window_close -1
+confirm_os_window_close 0
 
 # Keybindings
 map ctrl+insert copy_to_clipboard
 map shift+insert paste_from_clipboard
-# Kitty legacy encoding sends Alt+Shift+Enter the same as Alt+Enter; send CSI-u so tmux can match M-S-Enter.
-map alt+shift+enter send_text all \e[13;4u
-# Send Shift+Enter as CSI-u so TUIs can distinguish it from Enter.
-map shift+enter send_text all \e[13;2u
 map ctrl+shift+h show_scrollback
 map ctrl+shift+up neighboring_window up
 map ctrl+shift+down neighboring_window down
@@ -82,6 +74,3 @@ tab_title_template          {title}{' :{}:'.format(num_windows) if num_windows >
 # file simply does not exist, and a glob with no match is a no-op instead of a
 # startup warning.
 globinclude colors-matugen.conf
-
-# Allow cwd lookup from global keybindings
-listen_on unix:${XDG_RUNTIME_DIR}/omarchy-kitty-{kitty_pid}

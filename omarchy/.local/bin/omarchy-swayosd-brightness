@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Override of omarchy's own omarchy-swayosd-brightness, shadowing it via ~/.local/bin
+# coming before ~/.local/share/omarchy/bin on PATH.
+#
+# omarchy's brightness keys still own the hardware — omarchy-brightness-display walks
+# /sys/class/backlight and steps it with brightnessctl. Only the readout moves: the
+# quickshell (ii) OSD shows it instead of SwayOSD, so the display brightness indicator
+# matches the shell rather than being a second, differently styled overlay.
+#
+# ii's Brightness service has no watcher on /sys/class/backlight, so an external
+# brightnessctl write is invisible to it. `brightness notify` is what tells it, and it
+# takes the value on without writing the hardware back out.
+#
+# Delete this file to go back to SwayOSD.
+
+percent="$1"
+
+qs -c ii ipc call brightness notify "$percent" >/dev/null 2>&1
