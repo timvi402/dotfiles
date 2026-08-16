@@ -41,7 +41,9 @@ and no amount of restyling changes that.
   `omarchy plugin clone`, which copies into `~/.config/omarchy/plugins/`.
 - A broken lock screen either locks the session out or leaves the machine
   unlocked. Every change must be verifiable without locking the screen.
-- `/etc/pam.d/` needs root. Use `sudo` from an interactive terminal.
+- `/etc/pam.d/` needs root. A human at a terminal uses `sudo`; an agent uses
+  `pkexec`, which raises Omarchy's polkit dialog, because it has no terminal for
+  a password prompt. Pick by who is running, not by what is being changed.
 - The lock must keep following the Omarchy theme; nothing hardcoded.
 
 ## Scope
