@@ -24,6 +24,8 @@ Linux cloud image, cloud-init, GNU stow.
 - VM guest username is `timmy-xlent`, matching the host. Hardcoded absolute paths such as the `ii` symlink target are therefore not exercised; cross-user portability is explicitly out of scope.
 - VM specs: 4 vCPU, 8192 MB RAM, 40 GB disk, `os-variant archlinux`, storage pool `default` at `/var/lib/libvirt/images`.
 - Display: `--graphics spice,gl.enable=yes` with `--video virtio,accel3d=yes`. Software-render fallback is `WLR_RENDERER_ALLOW_SOFTWARE=1` in the guest.
+- The user is in the `libvirt` group, so Arch's polkit rule grants all virsh and virt-install operations without sudo. **No script under `vm/` may call sudo** — a password prompt stalls unattended runs. Verified empirically: `virsh -c qemu:///system vol-create-as default probe.qcow2 1M --format qcow2` succeeds with no sudo, no `sg` wrapper, and no re-login, because polkit's `isInGroup()` resolves through NSS rather than the calling process's supplementary groups.
+- The VM disk lives in the `default` pool at `/var/lib/libvirt/images` and is created through libvirt's volume API so libvirtd performs the privileged write. It cannot live under `$HOME`: home is mode 700, and while an ACL grants `libvirt-qemu` traverse, `mask::---` renders it `#effective:---`.
 - Verification for this plan is by observable command output, not a test framework. Provisioning scripts that drive libvirt have no meaningful unit-test seam; each task below states the exact command and the exact expected output.
 
 ---
@@ -306,21 +308,20 @@ VM_VCPUS="${VM_VCPUS:-4}"
 VM_DISK_GB="${VM_DISK_GB:-40}"
 VM_USER="${VM_USER:-timmy-xlent}"
 
-POOL_DIR="${POOL_DIR:-/var/lib/libvirt/images}"
-VM_DISK="${VM_DISK:-$POOL_DIR/$VM_NAME.qcow2}"
+# The disk is a libvirt pool volume addressed by name, not a path we write
+# ourselves — libvirtd performs the privileged write into the root-owned pool.
+POOL="${POOL:-default}"
+VOL="${VOL:-$VM_NAME.qcow2}"
 
 IMAGE_URL="${IMAGE_URL:-https://geo.mirror.pkgbuild.com/images/latest/Arch-Linux-x86_64-cloudimg.qcow2}"
 IMAGE_CACHE="${IMAGE_CACHE:-$HOME/.cache/arch-bootstrap/Arch-Linux-x86_64-cloudimg.qcow2}"
 
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
 
-# Write operations (define, snapshot, destroy) need org.libvirt.unix.manage,
-# which Arch's polkit rule grants only to the 'libvirt' group. This user is not
-# in it, so bare virsh would hit an interactive polkit prompt and break
-# scripting. sudo is used consistently instead.
-# Alternative long-term setup: usermod -aG libvirt "$USER" and re-login, then
-# drop the sudo here.
-VIRSH=(sudo virsh -c qemu:///system)
+# The user is in the 'libvirt' group, so Arch's polkit rule grants
+# org.libvirt.unix.manage without sudo. Nothing in vm/ may call sudo: a
+# password prompt would stall an unattended run.
+VIRSH=(virsh -c qemu:///system)
 
 msg() { printf '\033[36m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[31m==> %s\033[0m\n' "$*" >&2; exit 1; }
@@ -332,6 +333,12 @@ require_tool() {
 }
 
 vm_exists() { "${VIRSH[@]}" dominfo "$VM_NAME" >/dev/null 2>&1; }
+
+# Fail early and clearly if polkit will not grant write access.
+require_libvirt_rw() {
+  "${VIRSH[@]}" pool-list >/dev/null 2>&1 || die \
+    "cannot reach libvirt read-write; is $USER in the 'libvirt' group? (usermod -aG libvirt $USER)"
+}
 
 # Print the VM's IPv4 address, or nothing if it has none yet.
 vm_ip() {
