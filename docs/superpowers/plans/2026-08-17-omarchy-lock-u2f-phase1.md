@@ -16,7 +16,7 @@
 - All plugin edits go in `~/.config/omarchy/plugins/timmy-xlent.lock/` — created by `omarchy plugin clone`, never by hand.
 - `/etc/pam.d/` needs root. A human at a terminal uses `sudo`; an agent, which has no terminal for the password prompt to land in, uses `pkexec` and lets Omarchy's polkit agent raise the dialog. Pick by who is running, not by what is being changed.
 - A broken lock screen locks the session out or leaves the machine open. **No task may lock the screen until its verification has passed by another means.** Every task below is verifiable without locking, except Task 4, which locks only after Task 1 and Task 3 have passed and only with a TTY escape hatch open.
-- Saving any file under `~/.config/omarchy/plugins/` hot-reloads the shell. There is no build step and no restart.
+- Saving a file under `~/.config/omarchy/plugins/` hot-reloads *bar widgets*, but the lock plugin declares `keepLoaded: true` and a keep-loaded **service is not re-instantiated** by that reload. Quickshell still logs `Local plugin changed, reloading`, which makes the stale instance look updated. After every `Service.qml` edit run `omarchy restart shell`, and never verify a change against state that existed before it.
 - Target the exact strings the spec fixes: PAM service name `omarchy-lock-u2f`, authfile `/etc/fido2/fido2`, plugin id `timmy-xlent.lock`.
 - This machine is Omarchy `4.0.0-1`. Record that baseline (Task 6) — a cloned plugin stops receiving upstream updates.
 
