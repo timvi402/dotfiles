@@ -154,6 +154,12 @@ The clone is three files. Phase 1 touches two of them plus one root-owned file.
 
 ## Phase 1 — authentication
 
+**Status: implemented and verified, 2026-08-18.** SUPER+L locks and a YubiKey
+touch unlocks in ~2s. Commits `5dc13fb` (PAM service), `3dcd2e7` (plugin clone
+baseline), `e1b21df` (detection), `9b8c8ec` (authentication), `346c54d`
+(hardware prompt). Password and fingerprint both still unlock, and with the key
+absent nothing arms against it.
+
 ### The PAM service
 
 ```
@@ -295,10 +301,16 @@ plugin. Phase 1 is not observable end-to-end until that happens.
 ## Open questions
 
 1. Fcitx — is it in use? If not, the left island drops the systray.
-2. `unlockKeyring` — ii unlocked the keyring with the typed password. In
-   hardware-only mode there is no typed password, so the keyring may go
-   unlocked on a YubiKey unlock. Check whether 4.0 handles this and whether it
-   matters in practice.
+2. ~~`unlockKeyring`~~ — **ANSWERED, no regression.** Tested immediately after a
+   password-less YubiKey unlock: `secret-tool` returned 0, so the collection was
+   accessible and the keyring unlocked. The reason is that Omarchy's lock never
+   touches the keyring — `grep -ic keyring` over `Service.qml` returns 0, and
+   `omarchy-system-lock` has no keyring handling either. `gnome-keyring-daemon`
+   (pid confirmed via the `org.freedesktop.secrets` bus owner, running
+   `--components=pkcs11,secrets`) is unlocked by PAM at login and stays unlocked
+   across screen lock/unlock regardless of method. ii needed `unlockKeyring`
+   because its lock ran a keyring script on unlock; this one does not, so there
+   is nothing to carry over.
 3. Whether the password field should be hidden by default in Phase 2
    (ii's `hardwareOnly` posture) or remain visible. Deferred to Phase 2.
 
