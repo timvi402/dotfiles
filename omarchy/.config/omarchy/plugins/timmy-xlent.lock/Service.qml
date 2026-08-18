@@ -22,6 +22,9 @@ Item {
   property bool fingerprintAuthenticating: false
   property bool passwordPamConfigured: false
   property bool fingerprintConfigured: false
+  property bool u2fPamConfigured: false
+  property bool yubikeyPresent: false
+  property bool u2fAuthenticating: false
   property bool previewVisible: false
   property string enteredPassword: ""
   property string pendingPassword: ""
@@ -35,7 +38,16 @@ Item {
   property bool strandedLockResolved: false
 
   readonly property bool locked: lockRequested || sessionLock.locked || sessionLock.secure
-  readonly property bool authenticating: authenticatingPassword || fingerprintAuthenticating
+  readonly property bool authenticating: authenticatingPassword || fingerprintAuthenticating || u2fAuthenticating
+
+  // What the surface should ask for first. Fingerprint outranks password, and a
+  // present key outranks both; a configured-but-absent key falls through so the
+  // prompt can say "insert" rather than "touch".
+  readonly property string primaryMethod: {
+    if (u2fPamConfigured && yubikeyPresent) return "yubikey"
+    if (fingerprintConfigured) return "fingerprint"
+    return "password"
+  }
 
   function realScreenCount() {
     var screens = Quickshell.screens || []
@@ -105,6 +117,10 @@ Item {
 
   function refreshFingerprintStatus() {
     if (!fingerprintCheckProc.running) fingerprintCheckProc.running = true
+  }
+
+  function refreshYubikeyStatus() {
+    if (!yubikeyCheckProc.running) yubikeyCheckProc.running = true
   }
 
   function logEvent(event) {
@@ -387,6 +403,35 @@ Item {
   }
 
   Process {
+    id: yubikeyCheckProc
+    command: ["bash", "-c", "fido2-token -L 2>/dev/null | grep -q /dev/ && echo yes || echo no"]
+    stdout: StdioCollector { id: yubikeyCheckStdout; waitForEnd: true }
+    onExited: {
+      var present = String(yubikeyCheckStdout.text || "").trim() === "yes"
+      if (present !== root.yubikeyPresent) {
+        root.yubikeyPresent = present
+        root.logEvent("yubikey=" + present)
+      }
+    }
+  }
+
+  Timer {
+    id: yubikeyPollTimer
+    interval: 1500
+    repeat: true
+    triggeredOnStart: true
+    // Preview counts as well as a real lock: the preview surface renders the
+    // same prompt, so it needs the same live presence state behind it.
+    // Never probe while pam_u2f holds the token -- an active attempt already
+    // proves the key is there, and a concurrent fido2-token leaves pam_u2f
+    // sitting on a busy device.
+    // TEMPORARY (Task 3): u2fPam does not exist until Task 4. Restore
+    // `&& !u2fPam.active` in Task 4 Step 5.
+    running: root.locked || root.previewVisible
+    onTriggered: root.refreshYubikeyStatus()
+  }
+
+  Process {
     id: strandedLockCheckProc
     command: ["bash", "-c", "omarchy-hyprland-session-locked"]
     onExited: function(exitCode) {
@@ -490,6 +535,15 @@ Item {
     onFileChanged: reload()
   }
 
+  FileView {
+    path: "/etc/pam.d/omarchy-lock-u2f"
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.u2fPamConfigured = true
+    onLoadFailed: root.u2fPamConfigured = false
+    onFileChanged: reload()
+  }
+
   // No lock before PAM is known good. An answer from before then may be stale --
   // the failsafe can be cleared from a TTY -- so re-ask rather than act on it.
   onPasswordPamConfiguredChanged: {
@@ -504,6 +558,7 @@ Item {
   Component.onCompleted: {
     refreshBackground()
     refreshFingerprintStatus()
+    refreshYubikeyStatus()
     checkStrandedLock()
   }
 
@@ -530,6 +585,9 @@ Item {
         realScreens: root.realScreenCount(),
         passwordPam: root.passwordPamConfigured,
         fingerprint: root.fingerprintConfigured,
+        u2fPam: root.u2fPamConfigured,
+        yubikey: root.yubikeyPresent,
+        primaryMethod: root.primaryMethod,
         authenticating: root.authenticating,
         lastEvent: root.lastEvent,
         lastEventAt: root.lastEventAt
