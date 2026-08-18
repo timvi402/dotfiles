@@ -210,6 +210,11 @@ hiding of the password box (`hardwareOnly`) lands in Phase 2 with the islands.
 
 ## Phase 2 — the surface
 
+**Designed in detail in `2026-08-18-lock-surface-phase2-design.md`.** That
+spec supersedes the sketch below where they differ — most notably it drops
+the left island, since its username and keyboard-layout contents are both
+invariants on this machine.
+
 Three pills anchored bottom-centre, animating in on scale and opacity, over a
 blurred wallpaper and a neutral black dim. A large clock (120px, weight 500,
 with date) centred at roughly `-6%` vertical offset.
@@ -300,7 +305,9 @@ plugin. Phase 1 is not observable end-to-end until that happens.
 
 ## Open questions
 
-1. Fcitx — is it in use? If not, the left island drops the systray.
+1. ~~Fcitx~~ — **MOOT.** The left island is dropped in Phase 2 (both its
+   contents are invariants here: one configured keyboard layout, one user),
+   and the systray lived in it. See the Phase 2 spec.
 2. ~~`unlockKeyring`~~ — **ANSWERED, no regression.** Tested immediately after a
    password-less YubiKey unlock: `secret-tool` returned 0, so the collection was
    accessible and the keyring unlocked. The reason is that Omarchy's lock never
@@ -311,8 +318,10 @@ plugin. Phase 1 is not observable end-to-end until that happens.
    across screen lock/unlock regardless of method. ii needed `unlockKeyring`
    because its lock ran a keyring script on unlock; this one does not, so there
    is nothing to carry over.
-3. Whether the password field should be hidden by default in Phase 2
-   (ii's `hardwareOnly` posture) or remain visible. Deferred to Phase 2.
+3. ~~Password field hidden by default~~ — **RESOLVED: yes**, hidden behind a
+   deliberate action (typing or Esc), matching ii's `hardwareOnly` posture. The
+   field stays in the tree and keeps focus while hidden so the first keystroke
+   is not swallowed. See the Phase 2 spec.
 
 ## Follow-ups
 
