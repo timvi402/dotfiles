@@ -136,9 +136,12 @@ Item {
     failedAttempts = 0
     authenticatingPassword = false
     fingerprintAuthenticating = false
+    u2fAuthenticating = false
     fingerprintRetryTimer.stop()
+    u2fRetryTimer.stop()
     if (passwordPam.active) passwordPam.abort()
     if (fingerprintPam.active) fingerprintPam.abort()
+    if (u2fPam.active) u2fPam.abort()
   }
 
   function beginLock() {
@@ -243,6 +246,28 @@ Item {
     }
   }
 
+  function startU2f() {
+    if (!lockRequested || !sessionLock.secure) return
+    if (!u2fPamConfigured || !yubikeyPresent) return
+    if (u2fPam.active || u2fAuthenticating) return
+
+    u2fAuthenticating = true
+    if (!u2fPam.start()) {
+      u2fAuthenticating = false
+    }
+  }
+
+  function handleU2fFinished(result) {
+    u2fAuthenticating = false
+
+    if (!lockRequested) return
+    if (result === PamResult.Success) {
+      finishUnlock()
+    } else if (yubikeyPresent) {
+      u2fRetryTimer.restart()
+    }
+  }
+
   WlSessionLock {
     id: sessionLock
 
@@ -255,6 +280,7 @@ Item {
         sessionLockStabilizeTimer.stop()
         pendingSessionLockTimer.stop()
         root.startFingerprint()
+        root.startU2f()
       }
     }
 
@@ -376,6 +402,33 @@ Item {
     onTriggered: root.startFingerprint()
   }
 
+  PamContext {
+    id: u2fPam
+    config: "omarchy-lock-u2f"
+    user: root.userName
+
+    onCompleted: function(result) {
+      root.handleU2fFinished(result)
+    }
+
+    onError: function(error) {
+      root.u2fAuthenticating = false
+      if (root.lockRequested && root.yubikeyPresent) u2fRetryTimer.restart()
+    }
+  }
+
+  Timer {
+    id: u2fRetryTimer
+    // Longer than fingerprintRetryTimer's 250ms on purpose: fprintd serialises
+    // access to the sensor, but pam_u2f opens /dev/hidraw* directly, so a
+    // failed attempt leaves the device briefly busy while it settles. 2000ms
+    // clears that ~385ms busy window with room to spare, and stays far below
+    // the ~29s a genuine armed-but-untouched attempt takes to time out.
+    interval: 2000
+    repeat: false
+    onTriggered: root.startU2f()
+  }
+
   Process {
     id: readlinkProc
     command: ["readlink", "-f", root.currentBackgroundLink]
@@ -412,6 +465,8 @@ Item {
         root.yubikeyPresent = present
         root.logEvent("yubikey=" + present)
       }
+      if (root.lockRequested && present) root.startU2f()
+      else if (!present && u2fPam.active) u2fPam.abort()
     }
   }
 
@@ -425,9 +480,7 @@ Item {
     // Never probe while pam_u2f holds the token -- an active attempt already
     // proves the key is there, and a concurrent fido2-token leaves pam_u2f
     // sitting on a busy device.
-    // TEMPORARY (Task 3): u2fPam does not exist until Task 4. Restore
-    // `&& !u2fPam.active` in Task 4 Step 5.
-    running: root.locked || root.previewVisible
+    running: (root.locked || root.previewVisible) && !u2fPam.active
     onTriggered: root.refreshYubikeyStatus()
   }
 
