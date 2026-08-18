@@ -313,6 +313,8 @@ Item {
         backgroundPath: root.backgroundPath
         backgroundVersion: root.backgroundVersion
         fingerprintConfigured: root.fingerprintConfigured
+        primaryMethod: root.primaryMethod
+        u2fConfigured: root.u2fPamConfigured
         authenticatingPassword: root.authenticatingPassword
         failureMessage: root.failureMessage
         failedAttempts: root.failedAttempts
@@ -343,6 +345,8 @@ Item {
       backgroundPath: root.backgroundPath
       backgroundVersion: root.backgroundVersion
       fingerprintConfigured: root.fingerprintConfigured
+      primaryMethod: root.primaryMethod
+      u2fConfigured: root.u2fPamConfigured
       authenticatingPassword: false
       failureMessage: ""
       failedAttempts: 0

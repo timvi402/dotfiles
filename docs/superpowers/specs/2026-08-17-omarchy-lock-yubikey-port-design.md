@@ -41,6 +41,10 @@ and no amount of restyling changes that.
   `omarchy plugin clone`, which copies into `~/.config/omarchy/plugins/`.
 - A broken lock screen either locks the session out or leaves the machine
   unlocked. Every change must be verifiable without locking the screen.
+- The lock plugin is `keepLoaded: true`, so editing `Service.qml` does NOT take
+  effect on hot reload — the service instance survives it. Run
+  `omarchy restart shell` after every edit, and never treat a check that passes
+  against pre-existing state as evidence that new code loaded.
 - `/etc/pam.d/` needs root. A human at a terminal uses `sudo`; an agent uses
   `pkexec`, which raises Omarchy's polkit dialog, because it has no terminal for
   a password prompt. Pick by who is running, not by what is being changed.
@@ -216,6 +220,12 @@ what ii's component contributes visually.
   `lock`) pulsing 1.0↔0.4 on a 900ms loop while a device is armed, beside a
   two-line label. Falls back to the password field on keystroke or Esc.
 - **Right** — battery, sleep, power, restart. Unguarded, per Decisions.
+
+Carry over from Phase 1: the fingerprint prompt is currently
+`"Place your finger on the reader"`, which elides in Phase 1's 381px single-line
+field. It was taken from ii, where it sits in a two-line label with room for it.
+The two-line label below restores that room, so the string should render in full
+here — verify it does rather than assuming, and shorten it if not.
 
 Plus the `fallbackHint` pill above the main island — "Type or press Esc to use
 your password" — visible only while the password field is hidden.

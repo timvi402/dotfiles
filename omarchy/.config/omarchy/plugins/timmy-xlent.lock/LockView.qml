@@ -9,6 +9,8 @@ Item {
   property string backgroundPath: ""
   property int backgroundVersion: 0
   property bool fingerprintConfigured: false
+  property string primaryMethod: "password"
+  property bool u2fConfigured: false
   property bool authenticatingPassword: false
   property string failureMessage: ""
   property int failedAttempts: 0
@@ -17,7 +19,12 @@ Item {
   property string passwordText: ""
   property bool syncingPasswordText: false
 
-  readonly property string placeholderText: "Enter Password"
+  readonly property string placeholderText: {
+    if (root.primaryMethod === "yubikey") return "Touch your YubiKey"
+    if (root.primaryMethod === "fingerprint") return "Place your finger on the reader"
+    if (root.u2fConfigured) return "Insert your YubiKey"
+    return "Enter Password"
+  }
   readonly property int fieldWidth: 381
   readonly property int fieldHeight: 67
   readonly property int outlineThickness: 3
