@@ -55,3 +55,18 @@
 -- Enable touchpad gestures for moving focus (helpful on scrolling layout).
 -- hl.gesture({ fingers = 3, direction = "left", action = function() hl.dispatch(hl.dsp.focus({ direction = "l" })) end })
 -- hl.gesture({ fingers = 3, direction = "right", action = function() hl.dispatch(hl.dsp.focus({ direction = "r" })) end })
+
+-- Restore natural (inverse) scrolling. Omarchy 4.0 changed the default to
+-- false and the .conf -> .lua migration did not carry over the old setting.
+hl.config({
+  input = {
+    touchpad = {
+      natural_scroll = true,
+    },
+  },
+})
+
+-- repeat_delay: the pre-4.0 input.conf set 600; Omarchy 4.0's default is 250.
+-- The .conf -> .lua migration dropped it, and 250 was kept deliberately after
+-- review rather than restored. Recorded so the difference is not mistaken for
+-- another migration loss.
