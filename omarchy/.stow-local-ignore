@@ -1,0 +1,4 @@
+# system/ mirrors root-owned files outside $HOME (currently /etc/pam.d).
+# It is a record for rebuilds, not something stow should link -- without
+# this, `stow omarchy` would create ~/system or ~/etc symlinks.
+^/system$
