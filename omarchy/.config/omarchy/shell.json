@@ -66,14 +66,12 @@
   },
   "plugins": [
     {
-      "id": "timmy-xlent.lock"
+      "id": "io.github.sirjul1337.lock-explorer",
+      "design": "editorial"
     }
   ],
   "version": 1,
   "disabledPlugins": [
     "omarchy.lock"
-  ],
-  "cloneSourceRestores": [
-    "timmy-xlent.lock"
   ]
 }
