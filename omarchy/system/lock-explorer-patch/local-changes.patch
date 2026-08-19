@@ -1,6 +1,6 @@
-diff -ruN /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/designs/DesignBase.qml /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/designs/DesignBase.qml
---- /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/designs/DesignBase.qml	2026-08-19 08:04:39.611114022 +0200
-+++ /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/designs/DesignBase.qml	2026-08-19 08:35:31.592490227 +0200
+diff -ruN a/designs/DesignBase.qml b/designs/DesignBase.qml
+--- a/designs/DesignBase.qml	2026-08-19 08:04:39.611114022 +0200
++++ b/designs/DesignBase.qml	2026-08-19 08:35:31.592490227 +0200
 @@ -9,6 +9,8 @@
    property string backgroundPath: ""
    property int backgroundVersion: 0
@@ -10,9 +10,9 @@ diff -ruN /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/des
    property bool authenticatingPassword: false
    property string failureMessage: ""
    property int failedAttempts: 0
-diff -ruN /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/designs/Editorial.qml /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/designs/Editorial.qml
---- /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/designs/Editorial.qml	2026-08-19 08:04:39.611673497 +0200
-+++ /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/designs/Editorial.qml	2026-08-19 08:43:13.153194225 +0200
+diff -ruN a/designs/Editorial.qml b/designs/Editorial.qml
+--- a/designs/Editorial.qml	2026-08-19 08:04:39.611673497 +0200
++++ b/designs/Editorial.qml	2026-08-19 08:43:13.153194225 +0200
 @@ -37,7 +37,12 @@
      anchors.right: parent.right
      anchors.top: parent.top
@@ -27,9 +27,9 @@ diff -ruN /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/des
      color: lock.withAlpha(Color.lock.text, 0.75)
      font.family: Style.font.family
      font.pixelSize: Style.font.subtitle
-diff -ruN /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/LockHost.qml /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/LockHost.qml
---- /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/LockHost.qml	2026-08-19 08:04:39.609673432 +0200
-+++ /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/LockHost.qml	2026-08-19 08:35:24.052363167 +0200
+diff -ruN a/LockHost.qml b/LockHost.qml
+--- a/LockHost.qml	2026-08-19 08:04:39.609673432 +0200
++++ b/LockHost.qml	2026-08-19 08:35:24.052363167 +0200
 @@ -12,6 +12,8 @@
    property string backgroundPath: ""
    property int backgroundVersion: 0
@@ -48,9 +48,9 @@ diff -ruN /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/Loc
      it.authenticatingPassword = Qt.binding(function() { return host.authenticatingPassword })
      it.failureMessage = Qt.binding(function() { return host.failureMessage })
      it.failedAttempts = Qt.binding(function() { return host.failedAttempts })
-diff -ruN /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/Service.qml /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/Service.qml
---- /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/Service.qml	2026-08-19 08:04:39.610673464 +0200
-+++ /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/Service.qml	2026-08-19 08:34:56.242138703 +0200
+diff -ruN a/Service.qml b/Service.qml
+--- a/Service.qml	2026-08-19 08:04:39.610673464 +0200
++++ b/Service.qml	2026-08-19 08:34:56.242138703 +0200
 @@ -167,6 +167,9 @@
    property bool fingerprintAuthenticating: false
    property bool passwordPamConfigured: false
