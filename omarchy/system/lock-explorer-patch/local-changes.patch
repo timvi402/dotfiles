@@ -1,0 +1,275 @@
+diff -ruN /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/designs/DesignBase.qml /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/designs/DesignBase.qml
+--- /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/designs/DesignBase.qml	2026-08-19 08:04:39.611114022 +0200
++++ /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/designs/DesignBase.qml	2026-08-19 08:35:31.592490227 +0200
+@@ -9,6 +9,8 @@
+   property string backgroundPath: ""
+   property int backgroundVersion: 0
+   property bool fingerprintConfigured: false
++  property string primaryMethod: "password"
++  property bool u2fConfigured: false
+   property bool authenticatingPassword: false
+   property string failureMessage: ""
+   property int failedAttempts: 0
+diff -ruN /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/designs/Editorial.qml /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/designs/Editorial.qml
+--- /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/designs/Editorial.qml	2026-08-19 08:04:39.611673497 +0200
++++ /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/designs/Editorial.qml	2026-08-19 08:43:13.153194225 +0200
+@@ -37,7 +37,12 @@
+     anchors.right: parent.right
+     anchors.top: parent.top
+     anchors.margins: lock.margin
+-    text: lock.fingerprintConfigured ? "󰆠  FINGERPRINT READY" : "󰌾  LOCKED"
++    text: {
++      if (lock.primaryMethod === "yubikey")     return "󰯅  TOUCH YOUR YUBIKEY"
++      if (lock.primaryMethod === "fingerprint") return "󰈷  SCAN YOUR FINGERPRINT"
++      if (lock.u2fConfigured)                   return "󰯅  INSERT YOUR YUBIKEY"
++      return "󰌾  LOCKED"
++    }
+     color: lock.withAlpha(Color.lock.text, 0.75)
+     font.family: Style.font.family
+     font.pixelSize: Style.font.subtitle
+diff -ruN /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/LockHost.qml /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/LockHost.qml
+--- /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/LockHost.qml	2026-08-19 08:04:39.609673432 +0200
++++ /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/LockHost.qml	2026-08-19 08:35:24.052363167 +0200
+@@ -12,6 +12,8 @@
+   property string backgroundPath: ""
+   property int backgroundVersion: 0
+   property bool fingerprintConfigured: false
++  property string primaryMethod: "password"
++  property bool u2fConfigured: false
+   property bool authenticatingPassword: false
+   property string failureMessage: ""
+   property int failedAttempts: 0
+@@ -47,6 +49,8 @@
+     it.backgroundPath = Qt.binding(function() { return host.backgroundPath })
+     it.backgroundVersion = Qt.binding(function() { return host.backgroundVersion })
+     it.fingerprintConfigured = Qt.binding(function() { return host.fingerprintConfigured })
++    it.primaryMethod = Qt.binding(function() { return host.primaryMethod })
++    it.u2fConfigured = Qt.binding(function() { return host.u2fConfigured })
+     it.authenticatingPassword = Qt.binding(function() { return host.authenticatingPassword })
+     it.failureMessage = Qt.binding(function() { return host.failureMessage })
+     it.failedAttempts = Qt.binding(function() { return host.failedAttempts })
+diff -ruN /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/Service.qml /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/Service.qml
+--- /tmp/claude-1000/-home-timmy-xlent-dotfiles/lock-explorer-pristine/Service.qml	2026-08-19 08:04:39.610673464 +0200
++++ /home/timmy-xlent/.config/omarchy/plugins/io.github.sirjul1337.lock-explorer/Service.qml	2026-08-19 08:34:56.242138703 +0200
+@@ -167,6 +167,9 @@
+   property bool fingerprintAuthenticating: false
+   property bool passwordPamConfigured: false
+   property bool fingerprintConfigured: false
++  property bool u2fPamConfigured: false
++  property bool yubikeyPresent: false
++  property bool u2fAuthenticating: false
+   property bool previewVisible: false
+   property string enteredPassword: ""
+   property string pendingPassword: ""
+@@ -180,7 +183,16 @@
+   property bool strandedLockResolved: false
+ 
+   readonly property bool locked: lockRequested || sessionLock.locked || sessionLock.secure
+-  readonly property bool authenticating: authenticatingPassword || fingerprintAuthenticating
++  readonly property bool authenticating: authenticatingPassword || fingerprintAuthenticating || u2fAuthenticating
++
++  // What the surface should ask for first. Fingerprint outranks password, and a
++  // present key outranks both; a configured-but-absent key falls through so the
++  // prompt can say "insert" rather than "touch".
++  readonly property string primaryMethod: {
++    if (u2fPamConfigured && yubikeyPresent) return "yubikey"
++    if (fingerprintConfigured) return "fingerprint"
++    return "password"
++  }
+ 
+   function realScreenCount() {
+     var screens = Quickshell.screens || []
+@@ -252,6 +264,10 @@
+     if (!fingerprintCheckProc.running) fingerprintCheckProc.running = true
+   }
+ 
++  function refreshYubikeyStatus() {
++    if (!yubikeyCheckProc.running) yubikeyCheckProc.running = true
++  }
++
+   function logEvent(event) {
+     lastEvent = event
+     lastEventAt = new Date().toISOString()
+@@ -265,9 +281,12 @@
+     failedAttempts = 0
+     authenticatingPassword = false
+     fingerprintAuthenticating = false
++    u2fAuthenticating = false
+     fingerprintRetryTimer.stop()
++    u2fRetryTimer.stop()
+     if (passwordPam.active) passwordPam.abort()
+     if (fingerprintPam.active) fingerprintPam.abort()
++    if (u2fPam.active) u2fPam.abort()
+   }
+ 
+   function beginLock() {
+@@ -373,6 +392,28 @@
+     }
+   }
+ 
++  function startU2f() {
++    if (!lockRequested || !sessionLock.secure) return
++    if (!u2fPamConfigured || !yubikeyPresent) return
++    if (u2fPam.active || u2fAuthenticating) return
++
++    u2fAuthenticating = true
++    if (!u2fPam.start()) {
++      u2fAuthenticating = false
++    }
++  }
++
++  function handleU2fFinished(result) {
++    u2fAuthenticating = false
++
++    if (!lockRequested) return
++    if (result === PamResult.Success) {
++      finishUnlock()
++    } else if (yubikeyPresent) {
++      u2fRetryTimer.restart()
++    }
++  }
++
+   WlSessionLock {
+     id: sessionLock
+ 
+@@ -385,6 +426,7 @@
+         sessionLockStabilizeTimer.stop()
+         pendingSessionLockTimer.stop()
+         root.startFingerprint()
++        root.startU2f()
+       }
+     }
+ 
+@@ -420,6 +462,8 @@
+         backgroundPath: root.backgroundPath
+         backgroundVersion: root.backgroundVersion
+         fingerprintConfigured: root.fingerprintConfigured
++        primaryMethod: root.primaryMethod
++        u2fConfigured: root.u2fPamConfigured
+         authenticatingPassword: root.authenticatingPassword
+         failureMessage: root.failureMessage
+         failedAttempts: root.failedAttempts
+@@ -452,6 +496,8 @@
+       backgroundPath: root.backgroundPath
+       backgroundVersion: root.backgroundVersion
+       fingerprintConfigured: root.fingerprintConfigured
++      primaryMethod: root.primaryMethod
++      u2fConfigured: root.u2fPamConfigured
+       authenticatingPassword: false
+       failureMessage: root.previewFailure
+       failedAttempts: root.previewFailure.length > 0 ? 1 : 0
+@@ -512,6 +558,33 @@
+     onTriggered: root.startFingerprint()
+   }
+ 
++  PamContext {
++    id: u2fPam
++    config: "omarchy-lock-u2f"
++    user: root.userName
++
++    onCompleted: function(result) {
++      root.handleU2fFinished(result)
++    }
++
++    onError: function(error) {
++      root.u2fAuthenticating = false
++      if (root.lockRequested && root.yubikeyPresent) u2fRetryTimer.restart()
++    }
++  }
++
++  Timer {
++    id: u2fRetryTimer
++    // Longer than fingerprintRetryTimer's 250ms on purpose: fprintd serialises
++    // access to the sensor, but pam_u2f opens /dev/hidraw* directly, so a
++    // failed attempt leaves the device briefly busy while it settles. 2000ms
++    // clears that ~385ms busy window with room to spare, and stays far below
++    // the ~29s a genuine armed-but-untouched attempt takes to time out.
++    interval: 2000
++    repeat: false
++    onTriggered: root.startU2f()
++  }
++
+   Process {
+     id: userDesignsProc
+     command: ["bash", "-c", "ls -1 \"$0\"/*.qml 2>/dev/null", root.userDesignsDir]
+@@ -554,6 +627,35 @@
+   }
+ 
+   Process {
++    id: yubikeyCheckProc
++    command: ["bash", "-c", "fido2-token -L 2>/dev/null | grep -q /dev/ && echo yes || echo no"]
++    stdout: StdioCollector { id: yubikeyCheckStdout; waitForEnd: true }
++    onExited: {
++      var present = String(yubikeyCheckStdout.text || "").trim() === "yes"
++      if (present !== root.yubikeyPresent) {
++        root.yubikeyPresent = present
++        root.logEvent("yubikey=" + present)
++      }
++      if (root.lockRequested && present) root.startU2f()
++      else if (!present && u2fPam.active) u2fPam.abort()
++    }
++  }
++
++  Timer {
++    id: yubikeyPollTimer
++    interval: 1500
++    repeat: true
++    triggeredOnStart: true
++    // Preview counts as well as a real lock: the preview surface renders the
++    // same prompt, so it needs the same live presence state behind it.
++    // Never probe while pam_u2f holds the token -- an active attempt already
++    // proves the key is there, and a concurrent fido2-token leaves pam_u2f
++    // sitting on a busy device.
++    running: (root.locked || root.previewVisible) && !u2fPam.active
++    onTriggered: root.refreshYubikeyStatus()
++  }
++
++  Process {
+     id: strandedLockCheckProc
+     command: ["bash", "-c", "omarchy-hyprland-session-locked"]
+     onExited: function(exitCode) {
+@@ -580,7 +682,9 @@
+ 
+   Timer {
+     id: idleBlankTimer
+-    interval: 5000
++    // 60s, not upstream's 5s -- local preference: the 5s blank was too
++    // aggressive for this human's usage.
++    interval: 60000
+     repeat: false
+     property double armedAt: 0
+     onTriggered: {
+@@ -657,6 +761,15 @@
+     onFileChanged: reload()
+   }
+ 
++  FileView {
++    path: "/etc/pam.d/omarchy-lock-u2f"
++    watchChanges: true
++    printErrors: false
++    onLoaded: root.u2fPamConfigured = true
++    onLoadFailed: root.u2fPamConfigured = false
++    onFileChanged: reload()
++  }
++
+   // No lock before PAM is known good. An answer from before then may be stale --
+   // the failsafe can be cleared from a TTY -- so re-ask rather than act on it.
+   onPasswordPamConfiguredChanged: {
+@@ -671,6 +784,7 @@
+   Component.onCompleted: {
+     refreshBackground()
+     refreshFingerprintStatus()
++    refreshYubikeyStatus()
+     rescanUserDesigns()
+     checkStrandedLock()
+   }
+@@ -698,6 +812,9 @@
+         realScreens: root.realScreenCount(),
+         passwordPam: root.passwordPamConfigured,
+         fingerprint: root.fingerprintConfigured,
++        u2fPam: root.u2fPamConfigured,
++        yubikey: root.yubikeyPresent,
++        primaryMethod: root.primaryMethod,
+         authenticating: root.authenticating,
+         lastEvent: root.lastEvent,
+         lastEventAt: root.lastEventAt,
