@@ -7,3 +7,8 @@
 # its generated palette here. It is derived from the current wallpaper, not
 # configuration, and changes on every wallpaper switch.
 kitty/.config/kitty/colors-matugen.conf
+
+# ~/.config/nvim/lua/plugins/theme.lua is a symlink Omarchy maintains into
+# ~/.local/state/omarchy/current/theme/neovim.lua -- it follows the active
+# theme, so it is generated state, not configuration. Stow must not own it.
+nvim/.config/nvim/lua/plugins/theme.lua
