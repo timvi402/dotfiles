@@ -12,3 +12,9 @@ kitty/.config/kitty/colors-matugen.conf
 # ~/.local/state/omarchy/current/theme/neovim.lua -- it follows the active
 # theme, so it is generated state, not configuration. Stow must not own it.
 nvim/.config/nvim/lua/plugins/theme.lua
+
+# Timestamped kitty.conf.bak.<epoch> snapshots. Nothing on this system
+# creates these -- they come from editing sessions saving a copy before a
+# change, which git already does better. Six had accumulated in the repo
+# before they were removed.
+kitty/.config/kitty/kitty.conf.bak*
